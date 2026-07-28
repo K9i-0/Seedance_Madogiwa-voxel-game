@@ -396,9 +396,12 @@ export class GyunGyunQuest {
           <h1>ギュンギュン<br /><strong>クエスト</strong></h1>
           <p>魔王そば屋と 最高の一杯</p>
         </div>
-        <div class="title-party" aria-hidden="true">
-          <span class="hero-sprite large"><i></i></span>
-          <span class="mug-icon">🍺</span>
+        <div class="title-party">
+          <!-- NG変更: 正典画像で黒いフード付きローブ・白い顔・タコの触手を明確に見せる。 -->
+          <span class="title-takosan-frame">
+            <img class="title-takosan" src="characters/takosan-cutout.png" alt="黒いフードとたくさんの触手を持つ勇者たこさん" />
+          </span>
+          <span class="mug-icon" aria-hidden="true">🍺</span>
         </div>
         <button class="start-button" data-action="start"><span>▶</span> 冒険をはじめる</button>
         <small>音が出ます　／　オープニングはタップでスキップ</small>
