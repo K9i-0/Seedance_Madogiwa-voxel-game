@@ -15,7 +15,7 @@ const MAPS: Record<MapId, MapDefinition> = {
     id: "castle",
     name: "ギュンギュン城",
     hint: "福ちゃん王に話しかけよう",
-    start: { x: 5, y: 6 },
+    start: { x: 5, y: 5 },
     tiles: [
       "###########",
       "#....K....#",
@@ -24,36 +24,36 @@ const MAPS: Record<MapId, MapDefinition> = {
       "#.........#",
       "#.........#",
       "#####D#####",
-      "#####.#####",
+      "###########",
     ],
   },
   town: {
     id: "town",
     name: "ギュンギュン王国",
-    hint: "道具屋でビールを選ぼう",
-    start: { x: 5, y: 6 },
+    hint: "道具屋でビールを選ぼう（南の門から平原へ）",
+    start: { x: 5, y: 2 },
     tiles: [
       "###########",
-      "#...S.....#",
-      "#.hhhhh...#",
-      "#.........#",
+      "#####G#####",
+      "#.S....hh.#",
+      "#.h.......#",
       "#...f.....#",
-      "#.........#",
+      "#.h....h..#",
       "#####C#####",
-      "#####.#####",
+      "###########",
     ],
   },
   field: {
     id: "field",
     name: "ギュンギュン平原",
-    hint: "北東の洞窟を目指そう",
-    start: { x: 1, y: 6 },
+    hint: "北東の洞窟へ。西の街から城下町に戻れる",
+    start: { x: 2, y: 4 },
     tiles: [
       "###########",
       "#.......V.#",
       "#.~~~..##.#",
       "#...~.....#",
-      "#...~.~~..#",
+      "#T..~.~~..#",
       "#.........#",
       "#.........#",
       "###########",
@@ -63,7 +63,7 @@ const MAPS: Record<MapId, MapDefinition> = {
     id: "cave",
     name: "泡なき洞窟",
     hint: "一本道の奥へ進もう",
-    start: { x: 1, y: 6 },
+    start: { x: 1, y: 5 },
     tiles: [
       "###########",
       "########.B#",
@@ -71,7 +71,7 @@ const MAPS: Record<MapId, MapDefinition> = {
       "####......#",
       "####.######",
       "#....######",
-      "#.#########",
+      "#E#########",
       "###########",
     ],
   },
@@ -79,7 +79,7 @@ const MAPS: Record<MapId, MapDefinition> = {
     id: "throne",
     name: "魔王の間",
     hint: "そば屋に話しかけよう",
-    start: { x: 5, y: 6 },
+    start: { x: 5, y: 5 },
     tiles: [
       "###########",
       "#....M....#",
@@ -87,13 +87,33 @@ const MAPS: Record<MapId, MapDefinition> = {
       "#.t.....t.#",
       "#.........#",
       "#.........#",
-      "#####.#####",
+      "#####X#####",
       "###########",
     ],
   },
 };
 
-const WALKABLE = new Set([".", "D", "C", "V", "B", "S", "K", "M", "f"]);
+// NPC・建物・泉は通行不可（重なり防止）。歩けるのは床と出入口タイルのみ。
+const WALKABLE = new Set([".", "D", "C", "V", "B", "G", "T", "E", "X"]);
+// Aボタンで反応するタイル
+const INTERACTIVE = new Set(["K", "S", "M", "f", "h"]);
+const DELTA: Record<Direction, Position> = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+};
+// 出入口タイルを踏んだときの行き先と出現位置（双方向に行き来できる）
+const TRANSITIONS: Record<string, { to: MapId; spawn: Position }> = {
+  "castle:D": { to: "town", spawn: { x: 5, y: 2 } },
+  "town:G": { to: "castle", spawn: { x: 5, y: 5 } },
+  "town:C": { to: "field", spawn: { x: 2, y: 4 } },
+  "field:T": { to: "town", spawn: { x: 5, y: 5 } },
+  "field:V": { to: "cave", spawn: { x: 1, y: 5 } },
+  "cave:E": { to: "field", spawn: { x: 7, y: 1 } },
+  "cave:B": { to: "throne", spawn: { x: 5, y: 5 } },
+  "throne:X": { to: "cave", spawn: { x: 8, y: 1 } },
+};
 const ENEMY_IDLE = [
   "ぼーっと窓の外をながめている。",
   "遠くの雲を数えている。",
@@ -175,19 +195,19 @@ export class GyunGyunQuest {
     }
   }
 
+  private tileAt(x: number, y: number): string {
+    return MAPS[this.mapId].tiles[y]?.[x] ?? "#";
+  }
+
   private move(direction: Direction): void {
     if (this.phase !== "map") return;
     this.direction = direction;
-    const delta: Record<Direction, Position> = {
-      up: { x: 0, y: -1 },
-      down: { x: 0, y: 1 },
-      left: { x: -1, y: 0 },
-      right: { x: 1, y: 0 },
-    };
-    const next = { x: this.player.x + delta[direction].x, y: this.player.y + delta[direction].y };
-    const tile = MAPS[this.mapId].tiles[next.y]?.[next.x] ?? "#";
+    const next = { x: this.player.x + DELTA[direction].x, y: this.player.y + DELTA[direction].y };
+    const tile = this.tileAt(next.x, next.y);
     if (!WALKABLE.has(tile)) {
-      this.flash("そちらには進めない。");
+      // NPCや建物にぶつかったら向きだけ変えて、話しかけ方をガイドする
+      this.flash(INTERACTIVE.has(tile) ? "Aボタンで話しかけてみよう。" : "そちらには進めない。");
+      this.render();
       return;
     }
     this.player = next;
@@ -197,25 +217,14 @@ export class GyunGyunQuest {
   }
 
   private onStep(tile: string): void {
-    if (this.mapId === "castle" && tile === "D") {
-      if (!this.hasFunds) {
-        this.flash("王さまに旅の相談をしてから出発しよう。");
-        this.player = { x: 5, y: 5 };
-      } else {
-        this.enterMap("town", { x: 5, y: 6 });
-      }
+    if (this.mapId === "castle" && tile === "D" && !this.hasFunds) {
+      this.flash("王さまに旅の相談をしてから出発しよう。");
+      this.player = { x: 5, y: 5 };
       return;
     }
-    if (this.mapId === "town" && tile === "C") {
-      this.enterMap("field", { x: 1, y: 6 });
-      return;
-    }
-    if (this.mapId === "field" && tile === "V") {
-      this.enterMap("cave", MAPS.cave.start);
-      return;
-    }
-    if (this.mapId === "cave" && tile === "B") {
-      this.enterMap("throne", MAPS.throne.start);
+    const transition = TRANSITIONS[`${this.mapId}:${tile}`];
+    if (transition) {
+      this.enterMap(transition.to, transition.spawn);
       return;
     }
     if ((this.mapId === "field" || this.mapId === "cave") && this.steps > 0 && this.steps % 7 === 0) {
@@ -231,20 +240,29 @@ export class GyunGyunQuest {
 
   private interact(): void {
     if (this.phase !== "map") return;
-    const delta: Record<Direction, Position> = {
-      up: { x: 0, y: -1 },
-      down: { x: 0, y: 1 },
-      left: { x: -1, y: 0 },
-      right: { x: 1, y: 0 },
-    };
-    const target = { x: this.player.x + delta[this.direction].x, y: this.player.y + delta[this.direction].y };
-    const tile = MAPS[this.mapId].tiles[target.y]?.[target.x] ?? "#";
+    // 向いている方向を優先しつつ、隣接4マスのどこかにNPCがいれば話しかけられる
+    const order: Direction[] = [this.direction, "up", "down", "left", "right"];
+    let tile = "";
+    for (const dir of order) {
+      const candidate = this.tileAt(this.player.x + DELTA[dir].x, this.player.y + DELTA[dir].y);
+      if (INTERACTIVE.has(candidate)) {
+        tile = candidate;
+        this.direction = dir;
+        break;
+      }
+    }
     if (tile === "K") {
       this.talkToKing();
     } else if (tile === "S") {
       this.openShop();
     } else if (tile === "M") {
       this.startBoss();
+    } else if (tile === "f") {
+      this.flash("泉がギュンギュンと湧いている。ちょっと元気が出た。");
+      this.render();
+    } else if (tile === "h") {
+      this.flash("留守のようだ。みんな定時で帰ったらしい。");
+      this.render();
     } else {
       this.flash("そこには誰もいない。");
       this.render();
@@ -411,7 +429,32 @@ export class GyunGyunQuest {
 
   private renderMap(): void {
     const map = MAPS[this.mapId];
-    const tiles = map.tiles
+    // シェルは初回だけ構築し、歩行時はマップとテキストのみ差し替える（表示崩れ・ちらつき防止）
+    let shell = this.root.querySelector<HTMLElement>(".game-shell");
+    if (!shell) {
+      this.root.innerHTML = `
+        <section class="game-shell">
+          <header class="hud">
+            <div><span>LV</span><strong>1</strong></div>
+            <div class="hud-location"><span>現在地</span><strong data-field="location"></strong></div>
+            <div><span>G</span><strong data-field="money"></strong></div>
+          </header>
+          <div class="quest-strip"><span>目的</span><em data-field="hint"></em></div>
+          <div class="map-wrap">
+            <div class="map-grid"></div>
+            <div class="map-vignette"></div>
+          </div>
+          <div class="message-bar" data-field="message"></div>
+          <div class="inventory-strip"><b>どうぐ</b><span data-field="inventory"></span></div>
+          ${this.controlsMarkup()}
+        </section>`;
+      this.bindControls();
+      shell = this.root.querySelector<HTMLElement>(".game-shell")!;
+    }
+    const grid = shell.querySelector<HTMLElement>(".map-grid")!;
+    grid.style.setProperty("--cols", String(map.tiles[0]?.length ?? 11));
+    grid.style.setProperty("--rows", String(map.tiles.length));
+    grid.innerHTML = map.tiles
       .flatMap((row, y) =>
         [...row].map((tile, x) => {
           const playerHere = this.player.x === x && this.player.y === y;
@@ -421,23 +464,15 @@ export class GyunGyunQuest {
       )
       .join("");
     const inventoryNames = this.inventory.map((id) => ITEMS.find((item) => item.id === id)?.name).filter(Boolean);
-    this.root.innerHTML = `
-      <section class="game-shell">
-        <header class="hud">
-          <div><span>LV</span><strong>1</strong></div>
-          <div class="hud-location"><span>現在地</span><strong>${map.name}</strong></div>
-          <div><span>G</span><strong>${this.money}円</strong></div>
-        </header>
-        <div class="quest-strip"><span>目的</span>${map.hint}</div>
-        <div class="map-wrap">
-          <div class="map-grid" style="--cols:${map.tiles[0]?.length ?? 11}">${tiles}</div>
-          <div class="map-vignette"></div>
-        </div>
-        <div class="message-bar">${this.message || "十字キーで移動　Aで話す・調べる"}</div>
-        <div class="inventory-strip"><b>どうぐ</b>${inventoryNames.length ? inventoryNames.join("　") : "（からっぽ）"}</div>
-        ${this.controlsMarkup()}
-      </section>`;
-    this.bindControls();
+    const setField = (name: string, value: string) => {
+      const element = shell!.querySelector<HTMLElement>(`[data-field="${name}"]`);
+      if (element) element.textContent = value;
+    };
+    setField("location", map.name);
+    setField("money", `${this.money}円`);
+    setField("hint", map.hint);
+    setField("message", this.message || "十字キーで移動　Aで話す・調べる");
+    setField("inventory", inventoryNames.length ? inventoryNames.join("　") : "（からっぽ）");
     this.message = "";
   }
 
@@ -535,7 +570,7 @@ export class GyunGyunQuest {
     });
     this.root.querySelector<HTMLButtonElement>("[data-action='retreat']")?.addEventListener("click", () => {
       this.phase = "map";
-      this.enterMap("town", { x: 5, y: 6 });
+      this.enterMap("town", { x: 5, y: 5 });
       this.render();
     });
   }
@@ -548,13 +583,17 @@ export class GyunGyunQuest {
     if (tile === "f") return `<span class="fountain">♨</span>`;
     if (tile === "h") return `<span class="house"></span>`;
     if (tile === "t") return `<span class="torch">♨</span>`;
+    if (tile === "G") return `<span class="gate"><i>城</i></span>`;
+    if (tile === "T") return `<span class="town-icon"><i>町</i></span>`;
+    if (tile === "E") return `<span class="stairs"></span>`;
+    if (tile === "X") return `<span class="exit-door"></span>`;
     return "";
   }
 
   private tileClass(tile: string): string {
     if (tile === "#") return "wall";
     if (tile === "~") return "water";
-    if (tile === "D" || tile === "C" || tile === "B") return "path";
+    if (tile === "D" || tile === "C" || tile === "B" || tile === "G" || tile === "E" || tile === "X") return "path";
     return "ground";
   }
 
