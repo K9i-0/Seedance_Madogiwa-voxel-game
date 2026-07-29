@@ -85,6 +85,14 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 
 理由: 日本語の説明文はSeedanceでの再現精度が落ちること、および成果物を言語横断で扱いやすくするため。
 
+### 音声素材が渡された場合（Seedanceの発声禁止・重要）
+
+ユーザーからセリフ・ナレーション等の**音声ファイルが渡されたときは、その音声が正**であり、Seedanceに声を生成させない（生成音声と重なると二重音声になるため）。
+
+- 台本の該当クリップでは、セリフは**口の動き（リップシンク）の指定としてのみ**書く。引用の後に `(mouthed only — voice comes from the provided audio, NOT generated)` を付ける。
+- 各クリップのMotion promptに**否定指示を必ず入れる**: "characters mouth the dialogue in sync but produce NO voice audio; no speech sounds, no narration — dialogue audio will be added in post from the provided audio file"。環境音・効果音まで不要な場合は "no audio at all / silent clip" とする。
+- `script.md` のCapCut inputs表に `Audio` 行を追加し、渡された音声ファイル名と「CapCut編集で後付けする（Seedanceの音声出力はミュート）」ことを明記する（記載例は後述）。
+
 ## 2. Codexによるキーフレーム生成（開始＋終了の2枚）
 
 Seedance用プロンプトを作成したら、`codex` CLIの画像生成ツールで各クリップの**開始フレームと終了フレームの2枚**を生成し、**ステップ0で作成したラン専用ディレクトリに保存する**。これがSeedanceの First-Last-Frame 入力にそのまま渡る本番アセットになる。
@@ -155,3 +163,9 @@ codex exec -s workspace-write --enable image_generation \
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
 - クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ2のチェーンで担保）。
 - **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。
+- **ユーザーから音声ファイルが渡されているクリップ**では、対応表に `Audio` 行を追加し、Motion promptに発声禁止の否定指示を含める:
+
+```
+- Audio: use provided file <filename> — add it on the CapCut timeline in post; MUTE Seedance's generated audio
+- Motion prompt: <... characters mouth the dialogue in sync but produce NO voice audio; no speech sounds, no narration>
+```
