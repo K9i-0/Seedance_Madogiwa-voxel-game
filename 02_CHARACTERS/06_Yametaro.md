@@ -9,4 +9,5 @@
 作中の手配書表記は「YAMETARO」「やめ太郎」のことがある。
 NG変更: キャラクターデザイン。
 画像ファイル：Yametaro.jpg
+声ファイル：Yametaro_voice.wav（本人の声サンプル「意味がわからないのでつっこめない」。Irodori-TTSのボイスクローン参照音声。配役の正典は`VOICE_CAST.md`）
 ボクセルモデル：`04_GAME_ASSETS/voxel/models/yametaro.glb`（二足リグ。再生成は`04_GAME_ASSETS/voxel/tools/build_yametaro_voxel_model.py`）

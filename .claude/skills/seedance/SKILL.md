@@ -1,16 +1,17 @@
 ---
 name: seedance
-description: 窓際族物語のストーリー（あらすじ）からSeedance用の台本・動画生成プロンプト・Codex参考画像を作成するワークフロー。ユーザーからストーリーを渡されたとき、台本やSeedanceプロンプトの作成・修正を頼まれたとき、クリップの参考画像（キーフレーム）生成を頼まれたときに必ず使用する。
+description: 窓際族物語のストーリー（あらすじ）からSeedance用の台本・動画生成プロンプト・セリフ音声（VOICEVOX/Irodori-TTSボイスクローン）・Codex参考画像を作成するワークフロー。ユーザーからストーリーを渡されたとき、台本やSeedanceプロンプトの作成・修正を頼まれたとき、キャラのセリフ音声の生成を頼まれたとき、クリップの参考画像（キーフレーム）生成を頼まれたときに必ず使用する。
 ---
 
 # Seedance 動画制作ワークフロー
 
-ユーザーからストーリー（あらすじ）を渡されたら、以下の4ステップを一連の流れとして実行する。
+ユーザーからストーリー（あらすじ）を渡されたら、以下の5ステップを一連の流れとして実行する。
 
 1. このラン専用の出力ディレクトリを作成する
 2. 台本＋Seedanceプロンプト（英語）の作成（各クリップに開始状態と終了状態を明記する）
-3. Codexによる各クリップのキーフレーム生成（**開始フレーム＋終了フレームの2枚**を作る）
-4. Seedanceへの入力対応表（どの画像を開始/終了/参照として渡すか）を`script.md`に明記する
+3. VOICEVOXによる全セリフの音声生成（キャラの声はすべてローカルのVOICEVOXで作る）
+4. Codexによる各クリップのキーフレーム生成（**開始フレーム＋終了フレームの2枚**を作る）
+5. Seedanceへの入力対応表（どの画像・音声を開始/終了/参照として渡すか）を`script.md`に明記する
 
 ### 精度の要（この方式にする理由）
 
@@ -20,6 +21,7 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 
 - 世界観: `01_WORLD/WORLD_BIBLE.md`
 - キャラクター設定: `02_CHARACTERS/*.md`（各キャラのNG変更＝デザイン上変えてはいけない要素に注意）
+- ボイスキャスト表: `02_CHARACTERS/VOICE_CAST.md`（キャラ→VOICEVOX話者・スタイルIDの正典）
 - 過去の制作物: `03_SCRIPTS/`
 
 ## 0. 出力ディレクトリ（毎回、新しい同一ディレクトリにまとめる）
@@ -85,15 +87,62 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 
 理由: 日本語の説明文はSeedanceでの再現精度が落ちること、および成果物を言語横断で扱いやすくするため。
 
-### 音声素材が渡された場合（Seedanceの発声禁止・重要）
+### セリフ音声の扱い（Seedanceの発声禁止・音声添付必須・重要）
 
-ユーザーからセリフ・ナレーション等の**音声ファイルが渡されたときは、その音声が正**であり、Seedanceに声を生成させない（生成音声と重なると二重音声になるため）。
+**キャラクターのセリフ・ナレーションの音声は、すべてステップ2で生成した音声ファイル（キャラごとにVOICEVOXまたはIrodori-TTS。配役は`VOICE_CAST.md`が正）が正**であり、Seedanceに声を生成させない（生成音声と重なると二重音声になるため）。セリフのあるクリップで音声生成を省略してSeedance任せにすることは禁止。ユーザーから別途音声ファイルが渡された場合は、そのクリップに限りユーザー提供の音声を優先する。
 
-- 台本の該当クリップでは、セリフは**口の動き（リップシンク）の指定としてのみ**書く。引用の後に `(mouthed only — voice comes from the provided audio, NOT generated)` を付ける。
-- 各クリップのMotion promptに**否定指示を必ず入れる**: "characters mouth the dialogue in sync but produce NO voice audio; no speech sounds, no narration — dialogue audio will be added in post from the provided audio file"。環境音・効果音まで不要な場合は "no audio at all / silent clip" とする。
-- `script.md` のCapCut inputs表に `Audio` 行を追加し、渡された音声ファイル名と「CapCut編集で後付けする（Seedanceの音声出力はミュート）」ことを明記する（記載例は後述）。
+生成した音声は**Seedance（CapCut）生成時に添付ファイルとして渡し、動画にはその音声をそのまま使わせる**（キャラの口の動きは添付音声にリップシンクさせる）。
 
-## 2. Codexによるキーフレーム生成（開始＋終了の2枚）
+- 台本の各クリップでは、セリフは**口の動き（リップシンク）の指定としてのみ**書く。引用の後に `(lip-sync to the attached audio file — voice comes from the attached pre-generated audio, NOT generated)` を付ける。
+- セリフのあるクリップのMotion promptに**指示を必ず入れる**: "use the attached audio file as the dialogue audio AS-IS and lip-sync the characters to it; do NOT generate any voice — no synthesized speech, no narration"。環境音・効果音まで不要な場合は "no audio other than the attached file" とする。
+- `script.md` のCapCut inputs表に `Audio` 行を追加し、添付する音声ファイル名と「Seedance生成の入力として添付し、そのまま使わせる」ことを明記する（記載例は後述）。
+
+## 2. セリフ音声の生成（全セリフ必須）
+
+台本が完成したら、**台本中のすべてのセリフ・ナレーションの音声をローカルで生成し、ラン専用ディレクトリに保存する**。このwavはSeedance（CapCut）生成時に添付ファイルとして渡し、動画にそのまま使わせる（Seedanceの生成音声は使わない）。
+
+### 配役（正典）
+
+- キャラごとの使用エンジンと指定（Irodori-TTSの参照音声 / VOICEVOXの話者・スタイルID）は **`02_CHARACTERS/VOICE_CAST.md` が唯一の正**。この表にない声を勝手に割り当てない。
+- **本人の声サンプルがあるキャラ（そば屋・福ちゃん・やめたろう）はIrodori-TTSのボイスクローン**で生成する。参照音声は`02_CHARACTERS/<キャラ>_voice.wav`（各キャラ設定ファイルの「声ファイル：」に記載）。事前学習は不要で、**合成のたびに参照音声を渡す**ゼロショット方式。
+- それ以外のキャラはVOICEVOXで生成する。感情差分スタイルはシーンに合わせてVOICE_CAST.mdの範囲で選んでよい。
+- **ゆめみんは言葉を話さない**設定のため、台本にセリフ（言葉）を書かない。鳴き声（「きゅー！」「ぼんっ！」等）が必要な場合はVOICE_CAST.mdの指定voice（ずんだもん）で鳴き声テキストを生成する。
+
+### 生成手順
+
+1クリップ内のセリフ1つ（1人の連続した発話）につき1ファイル生成する。エンジンに応じて同梱スクリプトを使い分ける:
+
+```
+# Irodori-TTSのキャラ（そば屋・福ちゃん・やめたろう）
+.claude/skills/seedance/irodori_speak.sh "セリフテキスト" 03_SCRIPTS/<NN>_<slug>/clipN_lineM_<char>.wav 02_CHARACTERS/<キャラ>_voice.wav
+
+# VOICEVOXのキャラ
+.claude/skills/seedance/voicevox_speak.sh "セリフテキスト" 03_SCRIPTS/<NN>_<slug>/clipN_lineM_<char>.wav <スタイルID> [話速]
+```
+
+- VOICEVOXはエンジン未起動なら自動起動する（設置場所は`~/voicevox_engine/`）。Irodori-TTSは`~/irodori_tts`に設置済みであること（無いマシンではスクリプトのエラーメッセージに従う。1文あたり数十秒〜数分かかる）。
+- **ファイル名**: `clipN_lineM_<char>.wav`（N=クリップ番号、M=クリップ内の発話順、char=キャラ名小文字。例: `clip1_line2_sobaya.wav`）。台本ファイル・画像と同じ階層に置く。
+- 生成テキストは**実際に発話される日本語のセリフそのまま**を渡す（英訳やローマ字にしない）。イントネーションがおかしい場合は読み仮名に直したテキストで再生成してよい（台本上の表記は変えない）。
+- Irodori-TTSは生成ごとに揺らぎがある。**再生成して選び直したいときはシード値（第4引数）を変えて数候補作る**。良い結果のシードは`script.md`のDialogue audio表に記録しておくと再現できる。
+- スクリプトが出力する**再生時間（秒）を`script.md`のDialogue audio表に記録する**。クリップ尺はセリフの合計時間より長くする（尺に収まらない場合はクリップを延ばすか、VOICEVOXは話速を上げる）。
+- 生成後、各wavを再生確認できない環境でも、少なくとも全ファイルの存在と再生時間の妥当性（0.5秒未満や異常に長いものがないか）を確認する。
+
+### script.mdへの記載（Dialogue audio表・必須）
+
+`script.md`の冒頭（Prop state ledgerの近く）に、全セリフの通し表を書く（英語。セリフ本文のみ日本語のまま）:
+
+```
+## Dialogue audio (all voices pre-generated locally — Seedance must NOT generate any voice)
+
+| File | Clip | Character | Voice (engine) | Line (ja) | Duration |
+|------|------|-----------|----------------|-----------|----------|
+| clip1_line1_sobaya.wav | 1 | Sobaya | Irodori-TTS (ref: Sobaya_voice.wav, seed 42) | 快適です！ | 1.8s |
+| clip1_line2_yotan.wav  | 1 | Yotan  | VOICEVOX (style 100) | ロックだぜ。 | 1.5s |
+```
+
+さらに動画公開時のクレジット用に、使用したVOICEVOX話者の一覧を`script.md`末尾に記載する（例: `VOICEVOX:黒沢冴白 / VOICEVOX:ずんだもん`。対応は`VOICE_CAST.md`参照。Irodori-TTSのキャラはクレジット不要）。
+
+## 3. Codexによるキーフレーム生成（開始＋終了の2枚）
 
 Seedance用プロンプトを作成したら、`codex` CLIの画像生成ツールで各クリップの**開始フレームと終了フレームの2枚**を生成し、**ステップ0で作成したラン専用ディレクトリに保存する**。これがSeedanceの First-Last-Frame 入力にそのまま渡る本番アセットになる。
 
@@ -144,7 +193,7 @@ codex exec -s workspace-write --enable image_generation \
 - 保存先は必ず `03_SCRIPTS/<NN>_<slug>/` 配下。
 - ユーザーからストーリーを渡された際は、台本・Seedanceプロンプト作成に続けて、このルール（クリップごとに開始＋終了の2枚、前フレームを種にチェーン、キャラ参照を必ず添付、つなぎ目は共有）に沿ってキーフレームも生成する。
 
-## 3. CapCut（Seedance 2.0）への入力対応表
+## 4. CapCut（Seedance 2.0）への入力対応表
 
 動画生成は**CapCutに統合されたSeedance 2.0**で行う。CapCutは**開始フレーム（Frame A）と終了フレーム（Frame B）のデュアル参照**に対応し、参照画像も多数渡せる。`script.md`の各クリップに、**CapCutの各スロットへ何を渡すか**の対応表を必ず書く（ユーザーがそのまま設定できるようにするため）。
 
@@ -161,11 +210,11 @@ codex exec -s workspace-write --enable image_generation \
 
 - **開始/終了フレームは必ず両方セット**する。片方だけだと単一フレームからの外挿になりブレやすい。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
-- クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ2のチェーンで担保）。
+- クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ3のチェーンで担保）。
 - **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。
-- **ユーザーから音声ファイルが渡されているクリップ**では、対応表に `Audio` 行を追加し、Motion promptに発声禁止の否定指示を含める:
+- **セリフのあるクリップすべて**で、対応表に `Audio` 行を追加し（ステップ2で生成した音声ファイルをクリップ内の発話順に列挙）、**Seedance生成の入力として添付してそのまま使わせる**。Motion promptに音声添付の指示と発声禁止の否定指示を含める:
 
 ```
-- Audio: use provided file <filename> — add it on the CapCut timeline in post; MUTE Seedance's generated audio
-- Motion prompt: <... characters mouth the dialogue in sync but produce NO voice audio; no speech sounds, no narration>
+- Audio (attach to Seedance as input): clip1_line1_sobaya.wav, clip1_line2_yametaro.wav — use these files AS-IS as the dialogue audio track
+- Motion prompt: <... use the attached audio as the dialogue audio AS-IS and lip-sync the characters to it; do NOT generate any voice — no synthesized speech, no narration>
 ```
