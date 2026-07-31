@@ -12,6 +12,7 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 3. VOICEVOXによる全セリフの音声生成（キャラの声はすべてローカルのVOICEVOXで作る）
 4. Codexによる各クリップのキーフレーム生成（**開始フレーム＋終了フレームの2枚**を作る）
 5. Seedanceへの入力対応表（どの画像・音声を開始/終了/参照として渡すか）を`script.md`に明記する
+6. 生成実行プロトコル（パイロット1本検証→残りを生成→最終音声トラック差し替え）を`script.md`に明記する
 
 ### 精度の要（この方式にする理由）
 
@@ -76,6 +77,14 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 
 Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが多いクリップは短く割る**（中間キーフレーム入力が無いため、割ること自体が中間制御になる）。1本のプロンプトに詰め込みすぎない。
 
+### 話者分離ルール（1クリップ1話者・重要）
+
+Seedance 2.0は**複数人が映るクリップでのリップシンクの話者割り当てが弱い**（公式にも未解決の課題とされ、実際に「福ちゃんの音声でやめ太郎の口が動く」取り違えが起きた）。これを防ぐため:
+
+- **1クリップにつき話者は1人を原則とする。** 会話の掛け合いは、話者が交代するタイミングでクリップを分割する（分割はつなぎ目共有フレームで滑らかに繋がるので尺・演出上の不利益はない）。
+- 掛け合いのテンポ上どうしても1クリップに複数話者を入れる場合は、(1) 音声ファイルを発話順に分けて添付し、(2) Motion promptに話者の順番・誰がどの音声かを@メンションと見た目で明示し、(3) "the two lines do NOT overlap" を入れる。それでも取り違えが出たら迷わずクリップを割る。
+- 台本上は、各セリフに**話者のキャラ名＋見た目の同定句**を添える（後述「話者バインディング」参照）。
+
 ### 言語ルール（重要）
 
 **`script.md` は全文を英語で書く。** Seedanceに渡すプロンプト（コードブロック）だけでなく、見出し・尺やアスペクト比の説明・「画面内容」「カメラ」「音」「生成メモ」などの人間向け解説も含めて、すべて英語で記述する。
@@ -95,7 +104,16 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 
 - 台本の各クリップでは、セリフは**口の動き（リップシンク）の指定としてのみ**書く。引用の後に `(lip-sync to the attached audio file — voice comes from the attached pre-generated audio, NOT generated)` を付ける。
 - セリフのあるクリップのMotion promptに**指示を必ず入れる**: "use the attached audio file as the dialogue audio AS-IS and lip-sync the characters to it; do NOT generate any voice — no synthesized speech, no narration"。環境音・効果音まで不要な場合は "no audio other than the attached file" とする。
+
+### 話者バインディング（音声→キャラの紐付け・重要）
+
+モデルはキャラ名を知らないため、名前だけ書くと**別のキャラの口が動く取り違え**が起きる。セリフのあるクリップでは以下を必ず行う:
+
+- **@メンションで役割を固定する**: Seedance 2.0（Omni Reference）は添付ファイルを`@Image1`/`@Audio1`のようにプロンプト内で参照し役割を指定できる。Motion promptで音声と参照画像を明示的に結びつける: "ONLY Fukuchan (@Image3, the stylish man in the ...) speaks, lip-syncing to @Audio1"。
+- **話者は名前＋見た目の同定句で指定する**: キャラ名単独ではなく "Fukuchan — the stylish man in the green jacket" のように、参照画像から一意に分かる外見描写を毎回添える。
+- **話さないキャラは否定形で口を閉じさせる**: 画面内の非話者全員について "Yametaro (@Image4) does NOT speak — his mouth stays CLOSED, he only listens/reacts" を明記する。話者の指定だけでは足りず、非話者の禁止まで書くのが取り違え防止の肝。
 - `script.md` のCapCut inputs表に `Audio` 行を追加し、添付する音声ファイル名と「Seedance生成の入力として添付し、そのまま使わせる」ことを明記する（記載例は後述）。
+- **添付音声は「生成時の参照」で終わらせない。** 生成時に添付してもSeedanceが参照音声として扱い、最終動画に元音声が乗らない事故が起きた。**最終的な音声の正は、CapCutタイムライン上に明示的に並べ直したローカルwav**とする（生成クリップに埋め込まれた音声はミュートして差し替える）。手順はステップ5「生成実行プロトコル」で必ず`script.md`に記載する。
 
 ## 2. セリフ音声の生成（全セリフ必須）
 
@@ -197,6 +215,7 @@ codex exec -s workspace-write --enable image_generation \
 - `--enable image_generation` と、プロンプト内での明示的な "Use your image generation tool" を必ず両方指定する（省くとPythonの簡易描画にフォールバックすることがある）。
 - 終了フレーム生成では**開始フレームを必ず`-i`の先頭に入れ**、「framing/lighting/locationは維持、動きが変える部分だけ変更」と指示する。これが崩壊防止の肝。
 - クリップ間で同じ絵を共有できるときは**再生成せずファイルを使い回す**（生成ゆらぎを持ち込まない）。
+- **セリフのあるクリップのキーフレームには話者を視覚的に示す**: 話者は口を開けて話している最中の状態（ジェスチャー含む）で描き、非話者は口を閉じた状態で描く（例: "Fukuchan is mid-speech with his mouth open; Yametaro's mouth is closed, listening"）。キーフレーム自体が「誰が話しているか」の最も強いシグナルになり、リップシンクの取り違えを防ぐ。生成後の目視確認でも話者の口の開閉をチェックする。
 - 画像生成プロンプトには台本のProp states（グラスの中身の量、瓶の持ち方等）をそのまま含める。**生成後は各画像をReadで開き、小道具の状態がProp state ledgerの該当セルと一致しているか目視確認する**（例: 開始フレームのグラスが空であるべきなのに満杯で描かれていないか、瓶に口をつけていないか）。ズレていたら再生成する。キーフレームが間違っているとSeedanceは間違った状態間を忠実に補間してしまう。
 - 全キーフレーム生成後、**台帳の1行ごとに全フレームを時系列で見比べる最終チェック**を行う: 隣り合うフレーム間で小道具の状態が変わっている箇所すべてに、そのクリップのMotion prompt内の対応する動作があるか確認する。動作なしに状態が飛んでいる境界が1つでもあれば、該当フレームを再生成するか台本を直してから次の工程に進む。
 - 保存先は必ず `03_SCRIPTS/<NN>_<slug>/` 配下。
@@ -218,15 +237,19 @@ codex exec -s workspace-write --enable image_generation \
 ```
 
 - **開始/終了フレームは必ず両方セット**する。片方だけだと単一フレームからの外挿になりブレやすい。
+- **Motion promptは「そのまま貼れる完成形」で書き、実行時の要約・短縮を禁止する。** `script.md`のMotion promptがCapCutに入力される最終文字列そのものであり、生成実行者（人間・エージェント問わず）が独自に圧縮・言い換えしてはならない（過去に要約で開始/終了状態・プロップ・NG変更の制約が欠落し、整合性が崩れた）。プロンプトが長すぎて入らない・守られない場合は、要約するのではなく**台本に戻ってクリップを分割**し、1本あたりの情報量を減らす。
+- **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
 - クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ3のチェーンで担保）。
 - **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。
 - **セリフのあるクリップすべて**で、対応表に `Audio` 行を追加し（ステップ2で生成した音声ファイルをクリップ内の発話順に列挙）、**Seedance生成の入力として添付してそのまま使わせる**。Motion promptに音声添付の指示と発声禁止の否定指示を含める:
 
 ```
-- Audio (attach to Seedance as input): clip1_line1_sobaya.wav, clip1_line2_yametaro.wav — use these files AS-IS as the dialogue audio track
-- Motion prompt: <... use the attached audio as the dialogue audio AS-IS and lip-sync the characters to it; do NOT generate any voice — no synthesized speech, no narration>
+- Audio (attach to Seedance as input): clip1_line1_fukuchan.wav (@Audio1 — spoken by Fukuchan) — use AS-IS as the dialogue audio track
+- Motion prompt: <... ONLY Fukuchan (@Image3, the stylish man in the green jacket) speaks, lip-syncing to @Audio1; Yametaro (@Image4) does NOT speak — his mouth stays CLOSED, he only listens; use the attached audio AS-IS and do NOT generate any voice — no synthesized speech, no narration>
 ```
+
+- 話者バインディング（@メンション＋見た目の同定句＋非話者の口閉じ指示）はステップ1「話者バインディング」のルールに従い、**セリフのある全クリップのMotion promptに必ず入れる**。1クリップ1話者の原則（話者交代でクリップを割る）もここで守られていること。
 
 - **VOICEVOXの声を使ったランでは、対応表の末尾（全クリップの後）に動画内クレジットの指示を必ず書く**（ステップ2の「VOICEVOXクレジット表記」参照）。CapCutでの最終組み立て時に、エンドカードまたはテキストオーバーレイで `VOICEVOX:話者名` を動画内に表示させる:
 
@@ -235,3 +258,37 @@ codex exec -s workspace-write --enable image_generation \
 - On-screen credit text (end-card or overlay on the final clip): VOICEVOX:白上虎太郎 / VOICEVOX:ずんだもん
 - Add this with CapCut's text tool — do NOT render it via Seedance/keyframe images.
 ```
+
+## 5. 生成実行プロトコル（script.mdに必ず含める・実行者への指示）
+
+過去のランで「音声が生成時の参照扱いで終わり最終動画に元音声が乗らない」「12本を一括生成して尺・音声の検証を挟めない」「プロンプトの要約で制約が欠落する」失敗が起きた。再発防止のため、**`script.md`の末尾（Creditsの前）に以下のプロトコルをそのまま（英語で）記載する**。CapCutで生成・編集する実行者（ユーザー・エージェント問わず）はこれに従う。
+
+```
+## Generation & assembly protocol (REQUIRED — read before generating anything in CapCut)
+
+### Step 1 — Pilot clip first (batch generation is FORBIDDEN until the pilot passes)
+Generate ONLY Clip 1, then verify ALL of the following before touching any other clip:
+- [ ] The dialogue audio in the output is the attached wav AS-IS (no synthesized voice, no doubled voices)
+- [ ] The CORRECT character lip-syncs to each line (the speaker named in the prompt moves their mouth; every non-speaker's mouth stays closed)
+- [ ] Motion, poses and prop states match the Motion prompt and the Prop state ledger
+- [ ] The clip duration equals the Duration specified in the CapCut inputs table (NOT the ~8s default)
+If any check fails, fix the inputs/prompt and regenerate Clip 1 until all pass.
+Only then generate the remaining clips, and re-run at least the audio + duration checks on every clip.
+
+### Step 2 — Prompts are verbatim
+Paste each clip's Motion prompt into CapCut EXACTLY as written in this file.
+Do NOT summarize, shorten, or paraphrase it. If it seems too long, do not compress it —
+go back to the script and split the clip instead.
+
+### Step 3 — Final audio track (assembly)
+The audio embedded in the generated clips is NOT the final audio, even when the wav was
+attached at generation time. When assembling the final video on the CapCut timeline:
+1. Mute (or delete) the audio embedded in every generated clip.
+2. Lay the original wav files from the Dialogue audio table onto the timeline as the
+   final dialogue track, aligned to each character's lip movements.
+3. Play back the full timeline before export and confirm every line sounds exactly like
+   the local VOICEVOX / Irodori-TTS takes (the source wavs are the single source of truth).
+```
+
+- このプロトコルは**全クリップ生成前に読まれる位置**に置くこと（対応表の直後・Creditsの前）。
+- クリップ数が多いランほどStep 1の効果が大きい。パイロット検証を省略して一括生成することを本スキルでは禁止する。
