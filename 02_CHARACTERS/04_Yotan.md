@@ -6,4 +6,5 @@
 捕まった仲間にこっそり差し入れを持っていく優しさを併せ持つ。窓際族の店の復旧要員。
 NG変更: ギター、金髪、ロック服。
 画像ファイル：Yotan.jpg
+声ファイル：Yotan_voice.wav（Irodori-TTSのボイスクローン用参照音声。配役は`VOICE_CAST.md`が正）
 ボクセルモデル：`04_GAME_ASSETS/voxel/models/yotan.glb`（二足リグ、ギターはプライマリアーム固定。再生成は`04_GAME_ASSETS/voxel/tools/build_yotan_voxel_model.py`）
