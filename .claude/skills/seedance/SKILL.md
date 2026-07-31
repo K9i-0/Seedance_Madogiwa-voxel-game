@@ -143,7 +143,13 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 | clip1_line2_yotan.wav  | 1 | Yotan  | VOICEVOX (style 100) | ロックだぜ。 | 1.5s |
 ```
 
-さらに動画公開時のクレジット用に、使用したVOICEVOX話者の一覧を`script.md`末尾に記載する（例: `VOICEVOX:白上虎太郎 / VOICEVOX:ずんだもん`。対応は`VOICE_CAST.md`参照。Irodori-TTSのキャラはクレジット不要）。
+### VOICEVOXクレジット表記（動画内表示・必須）
+
+VOICEVOXの利用規約により、**VOICEVOXの声を1つでも使った動画には、動画内（画面内）に使用キャラクターのクレジット表記を必ず入れる**（概要欄だけで済ませない）。
+
+- `script.md`末尾に `## Credits` セクションを必ず書き、使用したVOICEVOX話者の一覧を記載する（例: `VOICEVOX:白上虎太郎 / VOICEVOX:ずんだもん`。話者名の対応は`VOICE_CAST.md`参照。Irodori-TTSのキャラはクレジット不要）。
+- 同セクションに、**CapCut編集時に動画内へクレジットを表示する指示**を明記する: 動画末尾のエンドカード、または最終クリップへのテキストオーバーレイとして、上記のクレジット文字列をそのまま表示する（例: `On-screen credit (add in CapCut as end-card/overlay text): VOICEVOX:白上虎太郎 / VOICEVOX:ずんだもん`）。
+- クレジットはSeedanceに画像・プロンプト経由で描画させない（文字が崩れるため）。**必ずCapCutのテキスト機能で載せる**。
 
 ## 3. Codexによるキーフレーム生成（開始＋終了の2枚）
 
@@ -220,4 +226,12 @@ codex exec -s workspace-write --enable image_generation \
 ```
 - Audio (attach to Seedance as input): clip1_line1_sobaya.wav, clip1_line2_yametaro.wav — use these files AS-IS as the dialogue audio track
 - Motion prompt: <... use the attached audio as the dialogue audio AS-IS and lip-sync the characters to it; do NOT generate any voice — no synthesized speech, no narration>
+```
+
+- **VOICEVOXの声を使ったランでは、対応表の末尾（全クリップの後）に動画内クレジットの指示を必ず書く**（ステップ2の「VOICEVOXクレジット表記」参照）。CapCutでの最終組み立て時に、エンドカードまたはテキストオーバーレイで `VOICEVOX:話者名` を動画内に表示させる:
+
+```
+### Credits (REQUIRED — add in CapCut before export)
+- On-screen credit text (end-card or overlay on the final clip): VOICEVOX:白上虎太郎 / VOICEVOX:ずんだもん
+- Add this with CapCut's text tool — do NOT render it via Seedance/keyframe images.
 ```
