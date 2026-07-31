@@ -116,6 +116,9 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 # Irodori-TTSのキャラ（そば屋・福ちゃん・やめたろう・おかやまん）
 .claude/skills/seedance/irodori_speak.sh "セリフテキスト" 03_SCRIPTS/<NN>_<slug>/clipN_lineM_<char>.wav 02_CHARACTERS/<キャラ>_voice.wav
 
+# そば屋のみ: クローン生成後にモンスターボイス加工を必ずかける（in-place。VOICE_CAST.md参照）
+.claude/skills/seedance/sobaya_monsterize.sh 03_SCRIPTS/<NN>_<slug>/clipN_lineM_sobaya.wav
+
 # VOICEVOXのキャラ
 .claude/skills/seedance/voicevox_speak.sh "セリフテキスト" 03_SCRIPTS/<NN>_<slug>/clipN_lineM_<char>.wav <スタイルID> [話速]
 ```
@@ -136,7 +139,7 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 
 | File | Clip | Character | Voice (engine) | Line (ja) | Duration |
 |------|------|-----------|----------------|-----------|----------|
-| clip1_line1_sobaya.wav | 1 | Sobaya | Irodori-TTS (ref: Sobaya_voice.wav, seed 42) | 快適です！ | 1.8s |
+| clip1_line1_sobaya.wav | 1 | Sobaya | Irodori-TTS (ref: Sobaya_voice.wav, seed 42) + monsterize | 快適です！ | 1.8s |
 | clip1_line2_yotan.wav  | 1 | Yotan  | VOICEVOX (style 100) | ロックだぜ。 | 1.5s |
 ```
 

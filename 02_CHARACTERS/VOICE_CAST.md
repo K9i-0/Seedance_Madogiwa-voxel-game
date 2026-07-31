@@ -11,7 +11,7 @@
 
 | キャラクター | エンジン | 指定 | 備考 |
 |---|---|---|---|
-| そば屋 | Irodori-TTS | 参照音声: `Sobaya_voice.wav` | 本人の声サンプル「こんにちゅあ〜」 |
+| そば屋 | Irodori-TTS＋モンスター加工 | 参照音声: `Sobaya_voice.wav` / 既定シード: `42` / 加工: `sobaya_monsterize.sh`（必須） | 本人の声サンプル8秒（X @sobaya15 status 2045045283705504143 の動画 0〜8秒、単独発話）。クローン出力にピッチ5半音下げ＋70Hzトレモロのモンスターボイス加工をかけたものが正典の声 |
 | 福ちゃん | Irodori-TTS | 参照音声: `Fukuchan_voice.wav` / 既定シード: `42` | 本人の声サンプル9秒（YouTube pXtc-nwr-sc 2:21〜2:30、単独発話・通常トーン） |
 | 無職やめたろう | Irodori-TTS | 参照音声: `Yametaro_voice.wav` / 既定シード: `7` | 本人の声サンプル7秒（YouTube pXtc-nwr-sc 3:46〜3:53、単独発話） |
 | たこさん | VOICEVOX | Voidoll / スタイル89（ノーマル） | 無機質・謎の存在感 |
