@@ -1,0 +1,23 @@
+ffconcat version 1.0
+file clip1_start.png
+duration 3
+file clip1_end.png
+duration 3
+file clip2_start.png
+duration 3
+file clip2_end.png
+duration 3
+file clip3_start.png
+duration 3
+file clip3_end.png
+duration 3
+file clip4_start.png
+duration 3
+file clip4_end.png
+duration 3
+file clip5_start.png
+duration 3
+file clip5_end.png
+duration 3
+file clip5_end.png
+duration 0.033333
