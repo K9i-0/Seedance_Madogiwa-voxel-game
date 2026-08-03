@@ -40,6 +40,17 @@ SEED_ARGS=()
   "${SEED_ARGS[@]}" >&2)
 
 head -c 4 "$OUT" | grep -q RIFF || { echo "ERROR: 合成に失敗しました（上のログ参照）" >&2; rm -f "$OUT"; exit 1; }
+
+# 前後の無音をトリムする（先頭~0.1s・末尾~0.2sだけ残す）。
+# 長い無音はSeedance添付時に口パクの開始位置を狂わせる（リップシンクずれの原因）。
+if command -v ffmpeg >/dev/null 2>&1; then
+  TMP="${OUT%.wav}.trim.wav"
+  ffmpeg -y -v error -i "$OUT" -af "silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.1,areverse,silenceremove=start_periods=1:start_threshold=-40dB:start_silence=0.2,areverse" "$TMP" \
+    && mv "$TMP" "$OUT" || { rm -f "$TMP"; echo "WARN: 無音トリムに失敗したため未トリムのまま出力します" >&2; }
+else
+  echo "WARN: ffmpegが無いため無音トリムをスキップしました（Seedanceでリップシンクがずれやすくなります）" >&2
+fi
+
 DUR=$(python3 -c "
 import wave
 w = wave.open('$OUT')
