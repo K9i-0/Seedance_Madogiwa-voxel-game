@@ -5,14 +5,15 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 
 # Seedance 動画制作ワークフロー
 
-ユーザーからストーリー（あらすじ）を渡されたら、以下の5ステップを一連の流れとして実行する。
+ユーザーからストーリー（あらすじ）を渡されたら、以下の7ステップを一連の流れとして実行する。
 
 1. このラン専用の出力ディレクトリを作成する
-2. 台本＋Seedanceプロンプト（英語）の作成（各クリップに開始状態と終了状態を明記する）
-3. VOICEVOXによる全セリフの音声生成（キャラの声はすべてローカルのVOICEVOXで作る）
-4. Codexによる各クリップのキーフレーム生成（**開始フレーム＋終了フレームの2枚**を作る）
-5. Seedanceへの入力対応表（どの画像・音声を開始/終了/参照として渡すか）を`script.md`に明記する
-6. 生成実行プロトコル（パイロット1本検証→残りを生成→最終音声トラック差し替え）を`script.md`に明記する
+2. **使用する全キャラクターシート・スケール参照画像をラン専用ディレクトリへ実ファイルとしてコピーする**
+3. 台本＋Seedanceプロンプト（英語）の作成（各クリップに開始状態と終了状態を明記する）
+4. VOICEVOX/Irodori-TTSによる全セリフの音声生成
+5. Codexによる各クリップのキーフレーム生成（**開始フレーム＋終了フレームの2枚**を作る）
+6. Seedanceへの入力対応表と、各Motion prompt内の添付宣言を`script.md`に明記する
+7. 生成実行プロトコルを明記し、同梱物の機械検証を通す
 
 ### 精度の要（この方式にする理由）
 
@@ -34,7 +35,19 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
   - `<slug>` は内容が分かる英語の短い識別子（小文字・アンダースコア区切り。例: `yametaro_43degrees`）。
 - そのディレクトリの中に、台本兼プロンプトファイル `script.md` と、全クリップの参考画像 `*.png` を **すべて同じ階層に** 置く。画像用のサブディレクトリは作らない。
 - 台本内から画像を参照するときは、同じディレクトリ内の相対パス（例: `clip1_01_ref.png`）で書く。
+- **「参考画像」には生成キーフレームだけでなく、CapCutへ添付するキャラクターシート、`height_lineup.png`、小道具・環境参照もすべて含む。** 使用する参照画像を`02_CHARACTERS/`等からラン専用ディレクトリ直下へコピーし、ファイル名を維持する。正典ファイルは変更しない。
+- 参照画像はsymlinkではなく**通常ファイルとして物理的に同梱する**。成果物フォルダだけを渡してもCapCut入力が完結する状態にする。
+- `script.md`では同梱ファイルをbasenameだけで参照する（例: `Sobaya_sheet.png`）。`../../02_CHARACTERS/Sobaya_sheet.png`のようなラン外への相対パスは禁止する。
+- キャラクターシートをラン外から参照できることを、同梱の代用にしてはいけない。1枚でも欠けていればそのランは未完成とする。
 - 既存の`03_SCRIPTS/`直下の古い成果物は移動・改変しない。この新ルールは新規ランから適用する。
+
+### 参照画像の同梱手順（必須・台本作成前に実行）
+
+1. 全クリップの登場キャラを列挙する（画面外の声だけのキャラも、Motion promptで`@ImageN`参照するなら対象）。
+2. 各キャラ設定mdの「キャラクターシート」に記載された`*_sheet.png`をラン専用ディレクトリ直下へコピーする。
+3. `height_lineup.png`等をCapCut入力で使う場合も同じ場所へコピーする。
+4. `script.md`冒頭の`Character references`には同梱後のbasenameだけを書く。
+5. 以降のキーフレーム生成とCapCut入力には、ラン専用ディレクトリ内のコピーを使う。これにより同梱漏れを制作途中で発見する。
 
 ## 1. 台本作成（deliverableはすべて英語）
 
@@ -191,6 +204,7 @@ Seedance用プロンプトを作成したら、`codex` CLIの画像生成ツー�
 ### キャラクター参照画像（同一性の固定）
 
 - **そのクリップに登場するキャラクター全員の参照画像を`-i`で渡す**。各キャラの**第一参照はキャラクターシート**`02_CHARACTERS/<キャラ名>_sheet.png`（多面図モデルシート: 三面図＋NG要素クローズアップ＋表情/アクション差分＋身長比較＋カラーパレット。各キャラ設定mdの「キャラクターシート：」に記載）。三面図は横顔・後ろ姿・振り向きのカットで、クローズアップはNG要素（仮面・触手・ウクレレ等）の維持に、表情差分は演技時の顔崩れ防止に効く。単体参照画像（「画像ファイル：」記載）は、シートで再現が甘い場合に追加で渡す。
+- 正典のシートをラン専用ディレクトリへコピーした後は、`codex exec -i`にも同梱コピー（`03_SCRIPTS/<NN>_<slug>/<Name>_sheet.png`）を渡す。正典パスを直接使って同梱確認を迂回しない。
 - プロンプト文中で「Image N: <キャラ名> reference — keep face/design and NG-change elements consistent」のように役割を明記し、NG変更対象（そば屋の仮面/たこさんの触手/とーくんのウクレレ等）を維持させる。
 
 ### コマンド例（クリップ1・そば屋/とーくん/よーたん/福ちゃん/無職やめたろう登場）
@@ -198,7 +212,7 @@ Seedance用プロンプトを作成したら、`codex` CLIの画像生成ツー�
 開始フレーム:
 ```
 codex exec -s workspace-write --enable image_generation \
-  -i 02_CHARACTERS/Sobaya_sheet.png -i 02_CHARACTERS/Tokun_sheet.png -i 02_CHARACTERS/Yotan_sheet.png -i 02_CHARACTERS/Fukuchan_sheet.png -i 02_CHARACTERS/Yametaro_sheet.png \
+  -i 03_SCRIPTS/<NN>_<slug>/Sobaya_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Tokun_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yotan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Fukuchan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yametaro_sheet.png \
   "Use your image generation tool to create the FIRST-FRAME still of a video shot. Input images Image 1..5 are character sheets (front/side/back turnarounds of each character; Sobaya: keep face/mask/build; Tokun: keep aloha/hat/ukulele; Yotan: keep blond/guitar/rock outfit; Fukuchan: keep stylish outfit; Yametaro: keep design) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's START state, excluding dialogue and camera-work notation>. Comedic slice-of-life anime-illustration style, single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_start.png."
 ```
 
@@ -206,7 +220,7 @@ codex exec -s workspace-write --enable image_generation \
 ```
 codex exec -s workspace-write --enable image_generation \
   -i 03_SCRIPTS/<NN>_<slug>/clip1_start.png \
-  -i 02_CHARACTERS/Sobaya_sheet.png -i 02_CHARACTERS/Tokun_sheet.png -i 02_CHARACTERS/Yotan_sheet.png -i 02_CHARACTERS/Fukuchan_sheet.png -i 02_CHARACTERS/Yametaro_sheet.png \
+  -i 03_SCRIPTS/<NN>_<slug>/Sobaya_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Tokun_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yotan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Fukuchan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yametaro_sheet.png \
   "Use your image generation tool to create the LAST-FRAME still of the same shot. Image 1 is this clip's start frame — keep the same characters, art style, framing, lighting and location, change ONLY what the motion changes. Images 2..6 are character sheets (front/side/back turnarounds) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's END state>. Single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_end.png."
 ```
 
@@ -245,9 +259,17 @@ codex exec -s workspace-write --enable image_generation \
 - **Motion promptは「そのまま貼れる完成形」で書き、実行時の要約・短縮を禁止する。** `script.md`のMotion promptがCapCutに入力される最終文字列そのものであり、生成実行者（人間・エージェント問わず）が独自に圧縮・言い換えしてはならない（過去に要約で開始/終了状態・プロップ・NG変更の制約が欠落し、整合性が崩れた）。プロンプトが長すぎて入らない・守られない場合は、要約するのではなく**台本に戻ってクリップを分割**し、1本あたりの情報量を減らす。
 - **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
+- **Reference images表に書いた全ファイルはラン専用ディレクトリ直下に実在しなければならない。** 表だけ書いて実ファイルを同梱しない状態は禁止する。
 - **キャラの参照はキャラクターシート`02_CHARACTERS/<キャラ名>_sheet.png`を第一に使う**（多面図モデルシート。複数アングル＋NG要素クローズアップ＋表情差分を1枚で渡せるため、横顔・後ろ姿・演技でのidentity driftに強い）。プロンプトには "Image N: <name>'s character model sheet — turnaround, detail close-ups and expressions of the SAME character, identity/design reference only, NOT a composition reference" のように役割を明記する。参照は画風の揃ったものだけを混ぜる（実写写真とアニメ調シートを同時に渡すと折衷して顔が変わるため、原則シート側に統一する）。
 - **シート上の文字ラベルの扱い**: シートには「SOBAYA」「MASK」等の短い英語ラベルが入っており、これは部位とキャラ名の紐付けを強めるため意図的なもの（実運用で精度向上が確認されている）。ただし**補間対象になるキーフレーム（clipN_start/end.png）には文字を入れない**方針は変わらない。Motion promptに "the reference sheets' text labels must NOT appear in the video" を入れておくと安全。
 - **シートとキャラの紐付けを対応表とプロンプトの両方で明示する**: 対応表のReference imagesは「@ImageN = ファイル名 → キャラ名（短い同定句）」の形で1行ずつ書く。Motion prompt内でキャラに言及するときは、毎回「キャラ名＋同定句＋@ImageN」で書く（例: "Sobaya (@Image1, the hulking masked man) lifts the mug"）。同定句は各キャラ設定md（`02_CHARACTERS/0N_*.md`）の「プロンプト用同定句（英語）：」が正典。年齢・身長・体格などの設定はシート画像に文字で書き込まず、この同定句としてプロンプト側で渡す（画像内の文字は動画に漏れて崩れるリスクがあり、モデルも文章仕様を確実には読まないため）。
+- **各Motion promptの冒頭に、添付必須ファイルをファイル名付きで再宣言する。** 対応表の外に書いただけでは不十分。次の形式で、該当クリップの全`@ImageN`を列挙する:
+
+```
+Required attached reference files: @Image1 = Sobaya_sheet.png — Sobaya's character model sheet, identity/design reference only, NOT a composition reference; @Image2 = Yotan_sheet.png — Yotan's character model sheet, identity/design reference only, NOT a composition reference. These reference attachments are REQUIRED inputs and must remain attached for this generation.
+```
+
+- Motion prompt中で`@ImageN`を使う場合、その同じプロンプト内の`Required attached reference files:`行に、`@ImageN = 実ファイル名`と役割が必ず存在しなければならない。名前＋外見同定句だけでは添付宣言の代用にならない。
 - **複数キャラが同時に映るクリップ**では、相対的な体格差を固定するため、身長比較画像`02_CHARACTERS/height_lineup.png`（全キャラ横並び・文字なし）をスケール参照として追加で渡してよい。プロンプトに "@ImageN is the height/scale reference for relative body sizes — NOT a composition reference" と役割を明記する。
 - クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ3のチェーンで担保）。
 - **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。
@@ -301,3 +323,21 @@ attached at generation time. When assembling the final video on the CapCut timel
 
 - このプロトコルは**全クリップ生成前に読まれる位置**に置くこと（対応表の直後・Creditsの前）。
 - クリップ数が多いランほどStep 1の効果が大きい。パイロット検証を省略して一括生成することを本スキルでは禁止する。
+
+## 6. 同梱物の最終検証（必須・完了報告の直前）
+
+次を実行し、成功するまで成果物を完了扱いにしない:
+
+```
+python3 .claude/skills/seedance/validate_run_bundle.py 03_SCRIPTS/<NN>_<slug>
+```
+
+検証は次を強制する:
+
+- CapCut入力表にある全PNG/WAVがラン専用ディレクトリ直下に存在する
+- キャラクターシートとスケール参照がsymlinkではなく通常ファイルとして同梱されている
+- `script.md`が`../../02_CHARACTERS/`等の外部パスを参照していない
+- 各Motion promptに`Required attached reference files:`があり、対応表の全`@ImageN = filename`がファイル名ごと再宣言されている
+- 各クリップのFrame A、Frame B、Audioが存在する
+
+検証失敗時は不足ファイルをコピーするかプロンプトを修正し、再実行する。**失敗したままユーザーへ完了報告してはいけない。**
