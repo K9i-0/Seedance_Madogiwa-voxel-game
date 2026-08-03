@@ -85,6 +85,14 @@ Seedance 2.0は**複数人が映るクリップでのリップシンクの話者
 - 掛け合いのテンポ上どうしても1クリップに複数話者を入れる場合は、(1) 音声ファイルを発話順に分けて添付し、(2) Motion promptに話者の順番・誰がどの音声かを@メンションと見た目で明示し、(3) "the two lines do NOT overlap" を入れる。それでも取り違えが出たら迷わずクリップを割る。
 - 台本上は、各セリフに**話者のキャラ名＋見た目の同定句**を添える（後述「話者バインディング」参照）。
 
+### リップシンク精度ルール（クリップ尺≒発話長・重要）
+
+Seedanceは「話す」と指示されたキャラの口を**クリップ全体にわたって動かしがち**で、クリップ尺が実発話より大幅に長いと口パクが音声からずれる（過去に4〜5秒のクリップへ実発話1.2〜1.7秒のwavを添付し、口の動きが約1.5秒遅れて始まり、音声終了後も1.5秒以上口が動き続ける動画になった）。これを防ぐため:
+
+- **セリフのあるクリップの尺は「添付する音声wavの合計長＋約1秒」を目安にする**（実発話がクリップ尺の6割を下回る設計にしない）。無言のリアクション・ため・間はセリフ入りクリップに詰め込まず、**セリフなしの別クリップに分割**する（つなぎ目共有フレームで滑らかに繋がるので演出上の不利益はない）。
+- **Motion promptに発話タイミングの拘束を必ず入れる**（話者バインディングの指示に加えて）: 話者について "begins the line almost immediately" と "the speaker's mouth moves ONLY while @Audio1 is playing — once the line ends the mouth stays CLOSED for the rest of the clip" を明記する。
+- **添付するwavは前後の無音をトリムしたものにする**（ステップ2の同梱スクリプトが自動でトリムする。ユーザー提供など別途用意したwavも添付前に無音をトリムする）。wav内の長い無音はSeedanceの口パク開始位置を狂わせる。
+
 ### 言語ルール（重要）
 
 **`script.md` は全文を英語で書く。** Seedanceに渡すプロンプト（コードブロック）だけでなく、見出し・尺やアスペクト比の説明・「画面内容」「カメラ」「音」「生成メモ」などの人間向け解説も含めて、すべて英語で記述する。
@@ -142,10 +150,11 @@ Seedance 2.0は**複数人が映るクリップでのリップシンクの話者
 ```
 
 - VOICEVOXはエンジン未起動なら自動起動する（設置場所は`~/voicevox_engine/`）。Irodori-TTSは`~/irodori_tts`に設置済みであること（無いマシンではスクリプトのエラーメッセージに従う。1文あたり数十秒〜数分かかる）。
+- 両スクリプトは合成後に**前後の無音を自動トリム**する（先頭約0.1秒・末尾約0.2秒だけ残す。長い無音はSeedanceの口パク開始位置を狂わせるため）。Dialogue audio表に記録する再生時間はトリム後の値を使う。
 - **ファイル名**: `clipN_lineM_<char>.wav`（N=クリップ番号、M=クリップ内の発話順、char=キャラ名小文字。例: `clip1_line2_sobaya.wav`）。台本ファイル・画像と同じ階層に置く。
 - 生成テキストは**実際に発話される日本語のセリフそのまま**を渡す（英訳やローマ字にしない）。イントネーションがおかしい場合は読み仮名に直したテキストで再生成してよい（台本上の表記は変えない）。
 - Irodori-TTSは生成ごとに揺らぎがある。**再生成して選び直したいときはシード値（第4引数）を変えて数候補作る**。良い結果のシードは`script.md`のDialogue audio表に記録しておくと再現できる。
-- スクリプトが出力する**再生時間（秒）を`script.md`のDialogue audio表に記録する**。クリップ尺はセリフの合計時間より長くする（尺に収まらない場合はクリップを延ばすか、VOICEVOXは話速を上げる）。
+- スクリプトが出力する**再生時間（秒）を`script.md`のDialogue audio表に記録する**。クリップ尺はセリフの合計時間より長くしつつ、**「音声wavの合計長＋約1秒」を目安に詰める**（ステップ1「リップシンク精度ルール」参照）。尺に収まらない場合はクリップを延ばすか、VOICEVOXは話速を上げる。
 - 生成後、各wavを再生確認できない環境でも、少なくとも全ファイルの存在と再生時間の妥当性（0.5秒未満や異常に長いものがないか）を確認する。
 
 ### script.mdへの記載（Dialogue audio表・必須）
@@ -243,7 +252,7 @@ codex exec -s workspace-write --enable image_generation \
 
 - **開始/終了フレームは必ず両方セット**する。片方だけだと単一フレームからの外挿になりブレやすい。
 - **Motion promptは「そのまま貼れる完成形」で書き、実行時の要約・短縮を禁止する。** `script.md`のMotion promptがCapCutに入力される最終文字列そのものであり、生成実行者（人間・エージェント問わず）が独自に圧縮・言い換えしてはならない（過去に要約で開始/終了状態・プロップ・NG変更の制約が欠落し、整合性が崩れた）。プロンプトが長すぎて入らない・守られない場合は、要約するのではなく**台本に戻ってクリップを分割**し、1本あたりの情報量を減らす。
-- **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。
+- **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。セリフのあるクリップのDurationは**「添付音声の合計長＋約1秒」**を目安にする（ステップ1「リップシンク精度ルール」参照）。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
 - **キャラの参照はキャラクターシート`02_CHARACTERS/<キャラ名>_sheet.png`を第一に使う**（多面図モデルシート。複数アングル＋NG要素クローズアップ＋表情差分を1枚で渡せるため、横顔・後ろ姿・演技でのidentity driftに強い）。プロンプトには "Image N: <name>'s character model sheet — turnaround, detail close-ups and expressions of the SAME character, identity/design reference only, NOT a composition reference" のように役割を明記する。参照は画風の揃ったものだけを混ぜる（実写写真とアニメ調シートを同時に渡すと折衷して顔が変わるため、原則シート側に統一する）。
 - **シート上の文字ラベルの扱い**: シートには「SOBAYA」「MASK」等の短い英語ラベルが入っており、これは部位とキャラ名の紐付けを強めるため意図的なもの（実運用で精度向上が確認されている）。ただし**補間対象になるキーフレーム（clipN_start/end.png）には文字を入れない**方針は変わらない。Motion promptに "the reference sheets' text labels must NOT appear in the video" を入れておくと安全。
@@ -255,7 +264,7 @@ codex exec -s workspace-write --enable image_generation \
 
 ```
 - Audio (attach to Seedance as input): clip1_line1_fukuchan.wav (@Audio1 — spoken by Fukuchan) — use AS-IS as the dialogue audio track
-- Motion prompt: <... ONLY Fukuchan (@Image3, the stylish man in the green jacket) speaks, lip-syncing to @Audio1; Yametaro (@Image4) does NOT speak — his mouth stays CLOSED, he only listens; use the attached audio AS-IS and do NOT generate any voice — no synthesized speech, no narration>
+- Motion prompt: <... ONLY Fukuchan (@Image3, the stylish man in the green jacket) speaks, lip-syncing to @Audio1 — he begins the line almost immediately, and his mouth moves ONLY while @Audio1 is playing; once the line ends his mouth stays CLOSED for the rest of the clip; Yametaro (@Image4) does NOT speak — his mouth stays CLOSED, he only listens; use the attached audio AS-IS and do NOT generate any voice — no synthesized speech, no narration>
 ```
 
 - 話者バインディング（@メンション＋見た目の同定句＋非話者の口閉じ指示）はステップ1「話者バインディング」のルールに従い、**セリフのある全クリップのMotion promptに必ず入れる**。1クリップ1話者の原則（話者交代でクリップを割る）もここで守られていること。
@@ -270,7 +279,7 @@ codex exec -s workspace-write --enable image_generation \
 
 ## 5. 生成実行プロトコル（script.mdに必ず含める・実行者への指示）
 
-過去のランで「音声が生成時の参照扱いで終わり最終動画に元音声が乗らない」「12本を一括生成して尺・音声の検証を挟めない」「プロンプトの要約で制約が欠落する」失敗が起きた。再発防止のため、**`script.md`の末尾（Creditsの前）に以下のプロトコルをそのまま（英語で）記載する**。CapCutで生成・編集する実行者（ユーザー・エージェント問わず）はこれに従う。
+過去のランで「音声が生成時の参照扱いで終わり最終動画に元音声が乗らない」「12本を一括生成して尺・音声の検証を挟めない」「プロンプトの要約で制約が欠落する」「クリップ尺が発話より大幅に長く、口パクが音声から1秒以上ずれる」失敗が起きた。再発防止のため、**`script.md`の末尾（Creditsの前）に以下のプロトコルをそのまま（英語で）記載する**。CapCutで生成・編集する実行者（ユーザー・エージェント問わず）はこれに従う。
 
 ```
 ## Generation & assembly protocol (REQUIRED — read before generating anything in CapCut)
@@ -279,6 +288,7 @@ codex exec -s workspace-write --enable image_generation \
 Generate ONLY Clip 1, then verify ALL of the following before touching any other clip:
 - [ ] The dialogue audio in the output is the attached wav AS-IS (no synthesized voice, no doubled voices)
 - [ ] The CORRECT character lip-syncs to each line (the speaker named in the prompt moves their mouth; every non-speaker's mouth stays closed)
+- [ ] Mouth motion starts and ends WITH the audio: the speaker's mouth starts moving when the line starts and stays CLOSED after the line ends (no lip-flap during silence)
 - [ ] Motion, poses and prop states match the Motion prompt and the Prop state ledger
 - [ ] The clip duration equals the Duration specified in the CapCut inputs table (NOT the ~8s default)
 If any check fails, fix the inputs/prompt and regenerate Clip 1 until all pass.
@@ -294,7 +304,9 @@ The audio embedded in the generated clips is NOT the final audio, even when the 
 attached at generation time. When assembling the final video on the CapCut timeline:
 1. Mute (or delete) the audio embedded in every generated clip.
 2. Lay the original wav files from the Dialogue audio table onto the timeline as the
-   final dialogue track, aligned to each character's lip movements.
+   final dialogue track. Align each wav to the VIDEO's mouth movement, NOT to the clip
+   boundary: nudge the wav until the speech onset lands on the frame where the speaker's
+   mouth starts moving.
 3. Play back the full timeline before export and confirm every line sounds exactly like
    the local VOICEVOX / Irodori-TTS takes (the source wavs are the single source of truth).
 ```
