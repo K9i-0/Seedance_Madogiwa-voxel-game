@@ -90,6 +90,24 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 
 Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが多いクリップは短く割る**（中間キーフレーム入力が無いため、割ること自体が中間制御になる）。1本のプロンプトに詰め込みすぎない。
 
+### 機構小物の配置整合性ルール（ドアノブ・蝶番・スイッチ等・重要）
+
+位置の指定がないと、生成モデルはドアノブ・蝶番・取っ手などの**動く建具・機構部品の位置を毎フレーム適当に描く**。その結果「蝶番側にノブが付く」「ドアを閉めている最中はノブがあるのに、閉まった途端に消える」等の破綻が起きる（過去に実際に発生した）。これを防ぐため:
+
+- **開閉・可動する建具/機構小物（ドア・引き戸・窓・引き出し・冷蔵庫・ノートPC等）が映るランでは、`script.md`冒頭（Prop state ledgerの近く）に機構レイアウト台帳（Fixture layout）を書く。** 建具ごとに1行: カメラから見た蝶番側（LEFT/RIGHT）、ノブ/取っ手の位置（**必ず蝶番と反対側の端**・高さ）、開き方向（内開き/外開き・どちらへスイングするか）。この台帳は**全クリップを通して不変**であり、唯一の正とする。
+
+```
+## Fixture layout (constant across ALL clips — hinges and handles never move)
+
+| Fixture | Hinge side (from camera) | Handle | Opens |
+|---------|--------------------------|--------|-------|
+| Entrance door | LEFT edge | silver lever handle on the RIGHT edge (opposite the hinges), mid-height | inward, swinging toward camera-left |
+```
+
+- **ノブ/取っ手は必ず蝶番の反対側の端に置く**（実物の建具の構造）。プロンプトでは片方だけ書かず、"hinged on its LEFT edge, with a silver lever handle on the RIGHT edge (the edge opposite the hinges) at mid-height" のように**蝶番側とノブ側を常にセットで**明示する。
+- **建具が映る全キーフレーム生成プロンプトと全Motion promptに、台帳のレイアウトを毎回そのまま繰り返す。** 開いた状態の絵にも閉まった状態の絵にも書く。特に閉まる/閉まった状態では否定形まで入れる: "the lever handle stays visible on the RIGHT edge even when the door is fully closed — the handle does NOT disappear, does NOT move to the hinge side, and is NOT duplicated"。ドアが動くクリップのMotion promptには "the hinges and handle stay fixed to the same edges of the door throughout the swing" を入れる。
+- **キーフレームの目視確認に金具を含める**: 生成した各フレームで (1) ノブ・取っ手が台帳どおりの側・高さにあるか、(2) 隣り合うフレーム間で蝶番・ノブの位置が動いたり消えたりしていないか、を確認し、ズレていたら再生成する。キーフレーム同士で金具位置が食い違うと、Seedanceは補間中にノブを消す・瞬間移動させる形で「辻褄合わせ」をしてしまう。
+
 ### 話者分離ルール（1クリップ1話者・重要）
 
 Seedance 2.0は**複数人が映るクリップでのリップシンクの話者割り当てが弱い**（公式にも未解決の課題とされ、実際に「福ちゃんの音声でやめ太郎の口が動く」取り違えが起きた）。これを防ぐため:
@@ -239,7 +257,7 @@ codex exec -s workspace-write --enable image_generation \
 - 終了フレーム生成では**開始フレームを必ず`-i`の先頭に入れ**、「framing/lighting/locationは維持、動きが変える部分だけ変更」と指示する。これが崩壊防止の肝。
 - クリップ間で同じ絵を共有できるときは**再生成せずファイルを使い回す**（生成ゆらぎを持ち込まない）。
 - **セリフのあるクリップのキーフレームには話者を視覚的に示す**: 話者は口を開けて話している最中の状態（ジェスチャー含む）で描き、非話者は口を閉じた状態で描く（例: "Fukuchan is mid-speech with his mouth open; Yametaro's mouth is closed, listening"）。キーフレーム自体が「誰が話しているか」の最も強いシグナルになり、リップシンクの取り違えを防ぐ。生成後の目視確認でも話者の口の開閉をチェックする。
-- 画像生成プロンプトには台本のProp states（グラスの中身の量、瓶の持ち方等）をそのまま含める。**生成後は各画像をReadで開き、小道具の状態がProp state ledgerの該当セルと一致しているか目視確認する**（例: 開始フレームのグラスが空であるべきなのに満杯で描かれていないか、瓶に口をつけていないか）。ズレていたら再生成する。キーフレームが間違っているとSeedanceは間違った状態間を忠実に補間してしまう。
+- 画像生成プロンプトには台本のProp states（グラスの中身の量、瓶の持ち方等）とFixture layout（蝶番側・ノブ側・開き方向）をそのまま含める。**生成後は各画像をReadで開き、小道具の状態がProp state ledgerの該当セルと一致しているか、建具の蝶番・ノブがFixture layoutどおりの側にあるか目視確認する**（例: 開始フレームのグラスが空であるべきなのに満杯で描かれていないか、瓶に口をつけていないか、閉まったドアのノブが蝶番側に付いたり消えたりしていないか）。ズレていたら再生成する。キーフレームが間違っているとSeedanceは間違った状態間を忠実に補間してしまう。
 - 全キーフレーム生成後、**台帳の1行ごとに全フレームを時系列で見比べる最終チェック**を行う: 隣り合うフレーム間で小道具の状態が変わっている箇所すべてに、そのクリップのMotion prompt内の対応する動作があるか確認する。動作なしに状態が飛んでいる境界が1つでもあれば、該当フレームを再生成するか台本を直してから次の工程に進む。
 - 保存先は必ず `03_SCRIPTS/<NN>_<slug>/` 配下。
 - ユーザーからストーリーを渡された際は、台本・Seedanceプロンプト作成に続けて、このルール（クリップごとに開始＋終了の2枚、前フレームを種にチェーン、キャラ参照を必ず添付、つなぎ目は共有）に沿ってキーフレームも生成する。
@@ -312,6 +330,7 @@ Generate ONLY Clip 1, then verify ALL of the following before touching any other
 - [ ] The CORRECT character lip-syncs to each line (the speaker named in the prompt moves their mouth; every non-speaker's mouth stays closed)
 - [ ] Mouth motion starts and ends WITH the audio: the speaker's mouth starts moving when the line starts and stays CLOSED after the line ends (no lip-flap during silence)
 - [ ] Motion, poses and prop states match the Motion prompt and the Prop state ledger
+- [ ] Hinges, handles and other fixture hardware stay on the edges given in the Fixture layout table in EVERY frame (handles never disappear, jump to the hinge side, or duplicate — especially when a door finishes closing)
 - [ ] The clip duration equals the Duration specified in the CapCut inputs table (NOT the ~8s default)
 If any check fails, fix the inputs/prompt and regenerate Clip 1 until all pass.
 Only then generate the remaining clips, and re-run at least the audio + duration checks on every clip.
