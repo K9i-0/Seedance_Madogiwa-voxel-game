@@ -110,7 +110,7 @@ Seedance 2.0は**複数人が映るクリップでのリップシンクの話者
 モデルはキャラ名を知らないため、名前だけ書くと**別のキャラの口が動く取り違え**が起きる。セリフのあるクリップでは以下を必ず行う:
 
 - **@メンションで役割を固定する**: Seedance 2.0（Omni Reference）は添付ファイルを`@Image1`/`@Audio1`のようにプロンプト内で参照し役割を指定できる。Motion promptで音声と参照画像を明示的に結びつける: "ONLY Fukuchan (@Image3, the stylish man in the ...) speaks, lip-syncing to @Audio1"。
-- **話者は名前＋見た目の同定句で指定する**: キャラ名単独ではなく "Fukuchan — the stylish man in the green jacket" のように、参照画像から一意に分かる外見描写を毎回添える。
+- **話者は名前＋見た目の同定句で指定する**: キャラ名単独ではなく "Fukuchan — the slim stylish black-haired man in a black long coat" のように、参照画像から一意に分かる外見描写を毎回添える。同定句は各キャラ設定md（`02_CHARACTERS/0N_*.md`）の「プロンプト用同定句（英語）：」を正典として使い、クリップごとに言い換えない（表記ゆれ自体が取り違えの原因になる）。
 - **話さないキャラは否定形で口を閉じさせる**: 画面内の非話者全員について "Yametaro (@Image4) does NOT speak — his mouth stays CLOSED, he only listens/reacts" を明記する。話者の指定だけでは足りず、非話者の禁止まで書くのが取り違え防止の肝。
 - `script.md` のCapCut inputs表に `Audio` 行を追加し、添付する音声ファイル名と「Seedance生成の入力として添付し、そのまま使わせる」ことを明記する（記載例は後述）。
 - **添付音声は「生成時の参照」で終わらせない。** 生成時に添付してもSeedanceが参照音声として扱い、最終動画に元音声が乗らない事故が起きた。**最終的な音声の正は、CapCutタイムライン上に明示的に並べ直したローカルwav**とする（生成クリップに埋め込まれた音声はミュートして差し替える）。手順はステップ5「生成実行プロトコル」で必ず`script.md`に記載する。
@@ -190,7 +190,7 @@ Seedance用プロンプトを作成したら、`codex` CLIの画像生成ツー�
 
 ### キャラクター参照画像（同一性の固定）
 
-- **そのクリップに登場するキャラクター全員の参照画像を`-i`で渡す**。各キャラの画像ファイルは`02_CHARACTERS/<キャラ名>.md`内の「画像ファイル：」に記載（`02_CHARACTERS/`配下に実体あり）。
+- **そのクリップに登場するキャラクター全員の参照画像を`-i`で渡す**。各キャラの**第一参照はキャラクターシート**`02_CHARACTERS/<キャラ名>_sheet.png`（多面図モデルシート: 三面図＋NG要素クローズアップ＋表情/アクション差分＋身長比較＋カラーパレット。各キャラ設定mdの「キャラクターシート：」に記載）。三面図は横顔・後ろ姿・振り向きのカットで、クローズアップはNG要素（仮面・触手・ウクレレ等）の維持に、表情差分は演技時の顔崩れ防止に効く。単体参照画像（「画像ファイル：」記載）は、シートで再現が甘い場合に追加で渡す。
 - プロンプト文中で「Image N: <キャラ名> reference — keep face/design and NG-change elements consistent」のように役割を明記し、NG変更対象（そば屋の仮面/たこさんの触手/とーくんのウクレレ等）を維持させる。
 
 ### コマンド例（クリップ1・そば屋/とーくん/よーたん/福ちゃん/無職やめたろう登場）
@@ -198,16 +198,16 @@ Seedance用プロンプトを作成したら、`codex` CLIの画像生成ツー�
 開始フレーム:
 ```
 codex exec -s workspace-write --enable image_generation \
-  -i 02_CHARACTERS/Sobaya.jpg -i 02_CHARACTERS/Tokun.jpg -i 02_CHARACTERS/Yotan.jpg -i 02_CHARACTERS/Fukuchan.jpg -i 02_CHARACTERS/Yametaro.jpg \
-  "Use your image generation tool to create the FIRST-FRAME still of a video shot. Input images Image 1..5 are character references (Sobaya: keep face/mask/build; Tokun: keep aloha/hat/ukulele; Yotan: keep blond/guitar/rock outfit; Fukuchan: keep stylish outfit; Yametaro: keep design) — keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's START state, excluding dialogue and camera-work notation>. Comedic slice-of-life anime-illustration style, single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_start.png."
+  -i 02_CHARACTERS/Sobaya_sheet.png -i 02_CHARACTERS/Tokun_sheet.png -i 02_CHARACTERS/Yotan_sheet.png -i 02_CHARACTERS/Fukuchan_sheet.png -i 02_CHARACTERS/Yametaro_sheet.png \
+  "Use your image generation tool to create the FIRST-FRAME still of a video shot. Input images Image 1..5 are character sheets (front/side/back turnarounds of each character; Sobaya: keep face/mask/build; Tokun: keep aloha/hat/ukulele; Yotan: keep blond/guitar/rock outfit; Fukuchan: keep stylish outfit; Yametaro: keep design) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's START state, excluding dialogue and camera-work notation>. Comedic slice-of-life anime-illustration style, single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_start.png."
 ```
 
 終了フレーム（開始フレームを種にする）:
 ```
 codex exec -s workspace-write --enable image_generation \
   -i 03_SCRIPTS/<NN>_<slug>/clip1_start.png \
-  -i 02_CHARACTERS/Sobaya.jpg -i 02_CHARACTERS/Tokun.jpg -i 02_CHARACTERS/Yotan.jpg -i 02_CHARACTERS/Fukuchan.jpg -i 02_CHARACTERS/Yametaro.jpg \
-  "Use your image generation tool to create the LAST-FRAME still of the same shot. Image 1 is this clip's start frame — keep the same characters, art style, framing, lighting and location, change ONLY what the motion changes. Images 2..6 are character references — keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's END state>. Single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_end.png."
+  -i 02_CHARACTERS/Sobaya_sheet.png -i 02_CHARACTERS/Tokun_sheet.png -i 02_CHARACTERS/Yotan_sheet.png -i 02_CHARACTERS/Fukuchan_sheet.png -i 02_CHARACTERS/Yametaro_sheet.png \
+  "Use your image generation tool to create the LAST-FRAME still of the same shot. Image 1 is this clip's start frame — keep the same characters, art style, framing, lighting and location, change ONLY what the motion changes. Images 2..6 are character sheets (front/side/back turnarounds) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's END state>. Single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_end.png."
 ```
 
 ### ポイント
@@ -231,7 +231,12 @@ codex exec -s workspace-write --enable image_generation \
 ### CapCut inputs (Clip 1)
 - Start frame (Frame A): clip1_start.png
 - End frame (Frame B):   clip1_end.png
-- Reference images (identity lock): Sobaya.jpg, Tokun.jpg, Yotan.jpg, Fukuchan.jpg, Yametaro.jpg
+- Reference images (identity lock — one line per file so CapCut slot numbers map to characters):
+  - @Image1 = Sobaya_sheet.png → Sobaya (the hulking 180cm/100kg masked man)
+  - @Image2 = Tokun_sheet.png → Tokun (the chubby 165cm man in straw hat and aloha shirt)
+  - @Image3 = Yotan_sheet.png → Yotan (the slim 170cm blond rocker)
+  - @Image4 = Fukuchan_sheet.png → Fukuchan (the slim stylish 170cm man in a black long coat)
+  - @Image5 = Yametaro_sheet.png → Yametaro (the chibi cartoon man with round glasses)
 - Motion prompt: <the clip's Seedance prompt — describe the motion BETWEEN the two frames as explicit state transitions (e.g. "pours beer into the EMPTY glass until it is full; no one drinks from the bottle"); dialogue kept in original language>
 - Duration: 5s / Aspect: 16:9
 ```
@@ -240,6 +245,10 @@ codex exec -s workspace-write --enable image_generation \
 - **Motion promptは「そのまま貼れる完成形」で書き、実行時の要約・短縮を禁止する。** `script.md`のMotion promptがCapCutに入力される最終文字列そのものであり、生成実行者（人間・エージェント問わず）が独自に圧縮・言い換えしてはならない（過去に要約で開始/終了状態・プロップ・NG変更の制約が欠落し、整合性が崩れた）。プロンプトが長すぎて入らない・守られない場合は、要約するのではなく**台本に戻ってクリップを分割**し、1本あたりの情報量を減らす。
 - **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
+- **キャラの参照はキャラクターシート`02_CHARACTERS/<キャラ名>_sheet.png`を第一に使う**（多面図モデルシート。複数アングル＋NG要素クローズアップ＋表情差分を1枚で渡せるため、横顔・後ろ姿・演技でのidentity driftに強い）。プロンプトには "Image N: <name>'s character model sheet — turnaround, detail close-ups and expressions of the SAME character, identity/design reference only, NOT a composition reference" のように役割を明記する。参照は画風の揃ったものだけを混ぜる（実写写真とアニメ調シートを同時に渡すと折衷して顔が変わるため、原則シート側に統一する）。
+- **シート上の文字ラベルの扱い**: シートには「SOBAYA」「MASK」等の短い英語ラベルが入っており、これは部位とキャラ名の紐付けを強めるため意図的なもの（実運用で精度向上が確認されている）。ただし**補間対象になるキーフレーム（clipN_start/end.png）には文字を入れない**方針は変わらない。Motion promptに "the reference sheets' text labels must NOT appear in the video" を入れておくと安全。
+- **シートとキャラの紐付けを対応表とプロンプトの両方で明示する**: 対応表のReference imagesは「@ImageN = ファイル名 → キャラ名（短い同定句）」の形で1行ずつ書く。Motion prompt内でキャラに言及するときは、毎回「キャラ名＋同定句＋@ImageN」で書く（例: "Sobaya (@Image1, the hulking masked man) lifts the mug"）。同定句は各キャラ設定md（`02_CHARACTERS/0N_*.md`）の「プロンプト用同定句（英語）：」が正典。年齢・身長・体格などの設定はシート画像に文字で書き込まず、この同定句としてプロンプト側で渡す（画像内の文字は動画に漏れて崩れるリスクがあり、モデルも文章仕様を確実には読まないため）。
+- **複数キャラが同時に映るクリップ**では、相対的な体格差を固定するため、身長比較画像`02_CHARACTERS/height_lineup.png`（全キャラ横並び・文字なし）をスケール参照として追加で渡してよい。プロンプトに "@ImageN is the height/scale reference for relative body sizes — NOT a composition reference" と役割を明記する。
 - クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ3のチェーンで担保）。
 - **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。
 - **セリフのあるクリップすべて**で、対応表に `Audio` 行を追加し（ステップ2で生成した音声ファイルをクリップ内の発話順に列挙）、**Seedance生成の入力として添付してそのまま使わせる**。Motion promptに音声添付の指示と発声禁止の否定指示を含める:
