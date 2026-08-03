@@ -9,5 +9,7 @@
 作中の手配書表記は「YAMETARO」「やめ太郎」のことがある。
 NG変更: キャラクターデザイン。
 画像ファイル：Yametaro.jpg
+キャラクターシート：Yametaro_sheet.png（多面図モデルシート: 三面図＋NG要素クローズアップ＋表情/アクション差分＋身長比較＋カラーパレット。Seedance/CapCutの参照画像とキーフレーム生成の第一参照に使う）
+プロンプト用同定句（英語）：Yametaro — the tiny chibi cartoon middle-aged man with an oversized head, black bowl-cut hair, small round white glasses, pink blush cheeks and a purple shirt (much shorter than every human character)
 声ファイル：Yametaro_voice.wav（本人の声サンプル7秒。YouTube pXtc-nwr-sc 3:46〜3:53の単独発話。Irodori-TTSのボイスクローン参照音声。配役の正典は`VOICE_CAST.md`）
 ボクセルモデル：`04_GAME_ASSETS/voxel/models/yametaro.glb`（二足リグ。再生成は`04_GAME_ASSETS/voxel/tools/build_yametaro_voxel_model.py`）

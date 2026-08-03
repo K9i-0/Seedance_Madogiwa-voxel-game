@@ -7,5 +7,7 @@
 会社の謎の「レギュレーション」を司る。
 NG変更: 穏やかな笑顔、スクリーン越しのリモート出演スタイル。
 画像ファイル：Okayaman.jpg
+キャラクターシート：Okayaman_sheet.png（多面図モデルシート: 三面図＋NG要素クローズアップ＋表情/アクション差分＋身長比較＋カラーパレット。Seedance/CapCutの参照画像とキーフレーム生成の第一参照に使う）
+プロンプト用同定句（英語）：Okayaman — the calm, gently smiling man with black medium-length hair, a thin mustache and goatee, in a black hooded jacket, usually appearing on a large remote screen
 声ファイル：Okayaman_voice.wav（Irodori-TTSのボイスクローン用参照音声。配役は`VOICE_CAST.md`が正）
 ボクセルモデル：`04_GAME_ASSETS/voxel/models/okayaman.glb`（スタンド＋大型スクリーンのリモート出演スタイル。スクリーンがVoxelRig_ArmPrimary。再生成は`04_GAME_ASSETS/voxel/tools/build_okayaman_voxel_model.py`）
