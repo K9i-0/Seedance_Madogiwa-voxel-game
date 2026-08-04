@@ -253,6 +253,7 @@ codex exec -s workspace-write --enable image_generation \
 
 ### ポイント
 
+- **Codexで生成するのは静止画のキーフレームPNGのみ。** 参考動画（モーション参照用のwebm/mp4など、動画ファイル全般）はCodexでは作らない。
 - `--enable image_generation` と、プロンプト内での明示的な "Use your image generation tool" を必ず両方指定する（省くとPythonの簡易描画にフォールバックすることがある）。
 - 終了フレーム生成では**開始フレームを必ず`-i`の先頭に入れ**、「framing/lighting/locationは維持、動きが変える部分だけ変更」と指示する。これが崩壊防止の肝。
 - クリップ間で同じ絵を共有できるときは**再生成せずファイルを使い回す**（生成ゆらぎを持ち込まない）。
@@ -299,7 +300,7 @@ Required attached reference files: @Image1 = Sobaya_sheet.png — Sobaya's chara
 - Motion prompt中で`@ImageN`を使う場合、その同じプロンプト内の`Required attached reference files:`行に、`@ImageN = 実ファイル名`と役割が必ず存在しなければならない。名前＋外見同定句だけでは添付宣言の代用にならない。
 - **複数キャラが同時に映るクリップ**では、相対的な体格差を固定するため、身長比較画像`02_CHARACTERS/height_lineup.png`（全キャラ横並び・文字なし）をスケール参照として追加で渡してよい。プロンプトに "@ImageN is the height/scale reference for relative body sizes — NOT a composition reference" と役割を明記する。
 - クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ3のチェーンで担保）。
-- **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。
+- **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。**この参考動画をCodexに作らせることは禁止**（Codexの担当は静止画キーフレームのみ）。ユーザーから明示的に依頼されたときに限り、Codex以外の手段（Three.jsレンダリング等）で作成する。
 - **セリフのあるクリップすべて**で、対応表に `Audio` 行を追加し（ステップ2で生成した音声ファイルをクリップ内の発話順に列挙）、**Seedance生成の入力として添付してそのまま使わせる**。Motion promptに音声添付の指示と発声禁止の否定指示を含める:
 
 ```
