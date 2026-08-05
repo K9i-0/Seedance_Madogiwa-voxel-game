@@ -14,10 +14,11 @@
 制作物ごとのワークフローはスキルに分離している。該当する作業ではスキルを呼び出して従うこと。
 
 - **Seedance動画制作** (`/seedance`): ユーザーからストーリー（あらすじ）を渡されたら、このスキルに従って台本＋Seedanceプロンプト＋セリフ音声（VOICEVOX/Irodori-TTSボイスクローン、配役の正典は`02_CHARACTERS/VOICE_CAST.md`）＋Codex参考画像を作成する。詳細: `.claude/skills/seedance/SKILL.md`
+- **ローカル動画制作** (`/local-video`): ユーザーから「**ローカルで動画作成して**」と指示されたら、`/seedance`ではなくこのスキルを使う。動画生成をクラウド（CapCut/Seedance）ではなくローカルのMiniMax H3（ComfyUI）で行い、キーフレームはdraw-things-cli、画像検証はQwen3-VL（Ollama）、音声はIrodori-TTS/VOICEVOX、結合はffmpegと全工程をローカルで完結させる。**実行できるのはClaude CodeとCursorのみ（Codexは対象外）。** Codexはこのスキルを使わず、「ローカルで動画作成して」と指示された場合はClaude CodeまたはCursorでの実行をユーザーに案内する（Codex自身は従来どおり`/seedance`のみ担当）。詳細: `.claude/skills/local-video/SKILL.md`
 - **ボクセルモデル制作** (`build-voxel-character-from-image`): キャラクターの参照画像からリグ付きボクセルGLBを作成・修正するときに使用する。成果物は`04_GAME_ASSETS/voxel/`に配置する。詳細: `.claude/skills/build-voxel-character-from-image/SKILL.md`
 - **2Dゲーム制作** (`/2d-game`): 2Dゲームを新規作成するとき、およびSeedanceで制作した完成動画（添付mp4）をオープニング/イベントのカットシーンとしてゲームに組み込むときに使用する。完成動画の正典置き場は`04_GAME_ASSETS/videos/`（ゲームからは`public/videos/`の相対symlinkで参照）。詳細: `.claude/skills/2d-game/SKILL.md`
 
-スキルの実体は`.claude/skills/`に置き、Codex CLI向けには`.agents/skills/`からsymlinkで同じスキルを参照させている（Claude Code・Codexの両方が同一のSKILL.mdを読む）。スキルを追加したら`.agents/skills/`にもsymlinkを張ること。
+スキルの実体は`.claude/skills/`に置き、他エージェントへは各ツールのスキルディレクトリからsymlinkで同じSKILL.mdを参照させる: Codex CLI向けは`.agents/skills/`、Cursor向けは`.cursor/skills/`。スキルを追加したら、そのスキルを使わせたいエージェントのディレクトリにsymlinkを張ること。**例外として`local-video`はClaude Code・Cursor専用**（`.cursor/skills/`にのみsymlinkし、`.agents/skills/`には張らない。Codexには公開しない）。
 
 ## 全制作物に共通の禁止事項
 `WORLD_BIBLE.md`の禁止事項（ブラック企業描写、いじめ、パワハラ、鬱展開、グロ描写）を厳守する。各キャラのNG変更（仮面/触手/ウクレレ等のデザイン要素）はどの媒体でも変更しない。
