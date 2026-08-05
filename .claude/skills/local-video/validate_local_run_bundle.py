@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+"""Validate that a local (MiniMax H3) run is a portable, self-contained input bundle.
+
+Checks every '### H3 inputs (Chapter N)' section in script.md:
+- all declared PNG/WAV files exist in the run directory as physical files (basenames only)
+- R2V chapters stay within H3's input limits (<=9 pictures, <=3 audio, <=12 files total)
+- every Motion prompt redeclares its attachments via 'Required attached input files:'
+- I2V chapters declare First/Last frame files
+- script.md does not reference paths outside the run directory
+"""
+
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+
+def fail(messages: list[str]) -> None:
+    for message in messages:
+        print(f"ERROR: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def check_bundled(run_dir: Path, chapter: str, label: str, filename: str, errors: list[str]) -> None:
+    if Path(filename).name != filename:
+        errors.append(f"Chapter {chapter}: {label} must use a bundled basename, not a path: {filename}")
+        return
+    bundled = run_dir / filename
+    if not bundled.is_file():
+        errors.append(f"Chapter {chapter}: missing bundled file: {filename}")
+    elif bundled.is_symlink():
+        errors.append(f"Chapter {chapter}: must be a physical file, not a symlink: {filename}")
+
+
+def main() -> None:
+    if len(sys.argv) != 2:
+        fail(["usage: validate_local_run_bundle.py 03_SCRIPTS/<NN>_<slug>"])
+
+    run_dir = Path(sys.argv[1])
+    script_path = run_dir / "script.md"
+    errors: list[str] = []
+
+    if not run_dir.is_dir():
+        fail([f"run directory does not exist: {run_dir}"])
+    if not script_path.is_file():
+        fail([f"missing script.md: {script_path}"])
+
+    text = script_path.read_text(encoding="utf-8")
+    if re.search(r"(?:\.\./)+(?:02_CHARACTERS|03_SCRIPTS)/", text):
+        errors.append("script.md references files outside the run; copy them into the run and use basenames")
+
+    sections = list(re.finditer(r"^### H3 inputs \(Chapter (\d+)\)\s*$", text, re.MULTILINE))
+    if not sections:
+        errors.append("no '### H3 inputs (Chapter N)' sections found")
+
+    for index, match in enumerate(sections):
+        chapter = match.group(1)
+        end = sections[index + 1].start() if index + 1 < len(sections) else len(text)
+        section = text[match.start():end]
+
+        mode_match = re.search(r"^- Mode:\s*(R2V|I2V)\s*$", section, re.MULTILINE)
+        if mode_match is None:
+            errors.append(f"Chapter {chapter}: missing '- Mode: R2V|I2V'")
+            continue
+        mode = mode_match.group(1)
+
+        prompt_marker = section.find("- Motion prompt:")
+        if prompt_marker < 0:
+            errors.append(f"Chapter {chapter}: missing Motion prompt")
+            prompt = ""
+            input_table = section
+        else:
+            prompt = section[prompt_marker:]
+            input_table = section[:prompt_marker]
+
+        if re.search(r"^- Duration:", section, re.MULTILINE) is None:
+            errors.append(f"Chapter {chapter}: missing Duration line")
+
+        if mode == "I2V":
+            for label in ("First frame", "Last frame"):
+                declaration = re.search(rf"^- {label}:\s*`([^`\n]+)`", input_table, re.MULTILINE)
+                if declaration is None:
+                    errors.append(f"Chapter {chapter}: I2V chapter missing {label} declaration")
+                else:
+                    check_bundled(run_dir, chapter, label, declaration.group(1), errors)
+            continue
+
+        pictures = re.findall(r"<Picture (\d+)>\s*=\s*`([^`]+\.png)`", input_table)
+        audios = re.findall(r"<Audio (\d+)>\s*=\s*`([^`]+\.wav)`", input_table)
+        videos = re.findall(r"<Video (\d+)>\s*=\s*`([^`]+)`", input_table)
+
+        if not pictures:
+            errors.append(f"Chapter {chapter}: R2V chapter declares no <Picture N> images")
+        if len(pictures) > 9:
+            errors.append(f"Chapter {chapter}: {len(pictures)} pictures exceeds H3's limit of 9")
+        if len(audios) > 3:
+            errors.append(f"Chapter {chapter}: {len(audios)} audio files exceeds H3's limit of 3")
+        total = len(pictures) + len(audios) + len(videos)
+        if total > 12:
+            errors.append(f"Chapter {chapter}: {total} input files exceeds H3's limit of 12")
+
+        for tag, mappings in (("Picture", pictures), ("Audio", audios), ("Video", videos)):
+            for slot, filename in mappings:
+                check_bundled(run_dir, chapter, f"<{tag} {slot}>", filename, errors)
+                if f"<{tag} {slot}> = {filename}" not in prompt:
+                    errors.append(
+                        f"Chapter {chapter}: Motion prompt does not redeclare '<{tag} {slot}> = {filename}'"
+                    )
+        if (pictures or audios) and "Required attached input files:" not in prompt:
+            errors.append(f"Chapter {chapter}: Motion prompt lacks 'Required attached input files:'")
+
+    if errors:
+        fail(errors)
+    print(f"OK: portable local-video (MiniMax H3) bundle validated: {run_dir}")
+
+
+if __name__ == "__main__":
+    main()
