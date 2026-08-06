@@ -90,6 +90,27 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 
 Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが多いクリップは短く割る**（中間キーフレーム入力が無いため、割ること自体が中間制御になる）。1本のプロンプトに詰め込みすぎない。
 
+### Scene ledger（場所・時間帯の通し台帳・必須）と場面転換の整合性ルール（昼夜ジャンプ防止・重要）
+
+時間帯・光の指定がないと、生成モデルは**場所の典型絵の時間帯**に寄る（「izakaya」→夜の赤提灯、「office」→昼の白い光、「bar」→夜）。その結果、場所が変わった瞬間に時間帯まで勝手に変わる（過去に実際に発生: 昼の明るいオフィスでビールを飲むクリップの直後、場面転換先の居酒屋が夜景で生成され、4秒で昼→夜にジャンプする動画になった）。これを防ぐため:
+
+- **`script.md`の冒頭（Prop state ledgerの近く）に、場面の通し台帳（Scene ledger）を表で書く。** 列＝キーフレーム境界（Prop state ledgerと同じ列構造。クリップNのLastとクリップN+1のFirstは1つの列を共有）、行＝Location / Time of day & light（必要ならWeatherも）。この台帳が場面情報の唯一の正となる。
+
+```
+## Scene ledger (location & time of day across ALL clips)
+
+| Scene state | C1 start | C1 end = C2 start | C2 end = C3 start | C3 end |
+|---|---|---|---|---|
+| Location | Office desk by the window | Office desk by the window | Izakaya entrance (exterior street) | Izakaya counter (interior) |
+| Time of day & light | Bright midday daylight | Bright midday daylight | Bright midday daylight, sunlit street | Midday; daylight coming through the entrance |
+```
+
+- **時間帯（昼/夕/夜）は全編を通して原則1つに固定する。** 短い動画で時間帯が変わると視聴者には転換ミスに見える。ストーリー上どうしても時間経過が必要な場合は、**時間が経ったことを画面内で視聴者に見せる**（空が夕焼けに変わっていく描写の専用クリップ、時計、経過を示すセリフ・ナレーション等）。それをせずに隣接クリップ間・クリップ内で時間帯を変えることを禁止する。
+- **カット・whip-pan・爆発・場所移動などの演出は、時間帯を変える理由にならない**（小道具の「演出を口実にした状態ジャンプ禁止」と同じ原則）。場所転換クリップでは、転換先の終了フレームもScene ledgerの同じ時間帯セルに従う。
+- **全キーフレーム生成プロンプトと全Motion promptに、その場面の時間帯・光の句を毎回明記する**（例: "bright midday daylight"、"warm golden sunset light"）。場所名だけを書いてはいけない。特に典型絵が夜の場所（居酒屋・バー・繁華街等）を昼に出す場合は、望む時間帯を大文字で強調し否定形も添える: "the street outside the izakaya in BRIGHT MIDDAY DAYLIGHT — it is DAYTIME, NOT night; no night sky, no darkness, the red lantern is unlit"。
+- **キーフレームの目視確認に時間帯・照明を含める**: 生成した各フレームで空・窓外・照明がScene ledgerの該当セルと一致しているか、隣り合うフレーム間で昼夜・光の色が急変していないかを確認し、ズレていたら再生成する。キーフレームが夜で生成されるとSeedanceはその夜を忠実に補間してしまう。
+- **論理チェック**: 台本を書き終えたらScene ledgerを左から右へ通しで読み、(1) 時間帯の変化がないか（あるなら画面内で時間経過を見せるクリップ・描写が対応しているか）、(2) 場所の変化がすべて画面内の移動・転換として描かれているか、を確認する。
+
 ### 機構小物の配置整合性ルール（ドアノブ・蝶番・スイッチ等・重要）
 
 位置の指定がないと、生成モデルはドアノブ・蝶番・取っ手などの**動く建具・機構部品の位置を毎フレーム適当に描く**。その結果「蝶番側にノブが付く」「ドアを閉めている最中はノブがあるのに、閉まった途端に消える」等の破綻が起きる（過去に実際に発生した）。これを防ぐため:
@@ -287,8 +308,8 @@ codex exec -s workspace-write --enable image_generation \
 - 終了フレーム生成では**開始フレームを必ず`-i`の先頭に入れ**、「framing/lighting/locationは維持、動きが変える部分だけ変更」と指示する。これが崩壊防止の肝。
 - クリップ間で同じ絵を共有できるときは**再生成せずファイルを使い回す**（生成ゆらぎを持ち込まない）。
 - **セリフのあるクリップのキーフレームには話者を視覚的に示す**: 話者は口を開けて話している最中の状態（ジェスチャー含む）で描き、非話者は口を閉じた状態で描く（例: "Fukuchan is mid-speech with his mouth open; Yametaro's mouth is closed, listening"）。キーフレーム自体が「誰が話しているか」の最も強いシグナルになり、リップシンクの取り違えを防ぐ。生成後の目視確認でも話者の口の開閉をチェックする。
-- 画像生成プロンプトには台本のProp states（グラスの中身の量、瓶の持ち方等）とFixture layout（蝶番側・ノブ側・開き方向）をそのまま含める。**生成後は各画像をReadで開き、小道具の状態がProp state ledgerの該当セルと一致しているか、建具の蝶番・ノブがFixture layoutどおりの側にあるか目視確認する**（例: 開始フレームのグラスが空であるべきなのに満杯で描かれていないか、瓶に口をつけていないか、閉まったドアのノブが蝶番側に付いたり消えたりしていないか）。ズレていたら再生成する。キーフレームが間違っているとSeedanceは間違った状態間を忠実に補間してしまう。
-- 全キーフレーム生成後、**台帳の1行ごとに全フレームを時系列で見比べる最終チェック**を行う: 隣り合うフレーム間で小道具の状態が変わっている箇所すべてに、そのクリップのMotion prompt内の対応する動作があるか確認する。動作なしに状態が飛んでいる境界が1つでもあれば、該当フレームを再生成するか台本を直してから次の工程に進む。
+- 画像生成プロンプトには台本のProp states（グラスの中身の量、瓶の持ち方等）・Fixture layout（蝶番側・ノブ側・開き方向）・**Scene ledgerの時間帯・光の句**（例: "bright midday daylight"）をそのまま含める。**生成後は各画像をReadで開き、小道具の状態がProp state ledgerの該当セルと一致しているか、建具の蝶番・ノブがFixture layoutどおりの側にあるか、時間帯・照明がScene ledgerの該当セルと一致しているか目視確認する**（例: 開始フレームのグラスが空であるべきなのに満杯で描かれていないか、瓶に口をつけていないか、閉まったドアのノブが蝶番側に付いたり消えたりしていないか、昼の場面なのに夜景・夜空で描かれていないか）。ズレていたら再生成する。キーフレームが間違っているとSeedanceは間違った状態間を忠実に補間してしまう。
+- 全キーフレーム生成後、**台帳（Prop state ledger・Scene ledger）の1行ごとに全フレームを時系列で見比べる最終チェック**を行う: 隣り合うフレーム間で小道具の状態が変わっている箇所すべてに、そのクリップのMotion prompt内の対応する動作があるか、時間帯・場所が変わっている箇所すべてに画面内の移動・時間経過の描写が対応しているかを確認する。動作なしに状態が飛んでいる境界が1つでもあれば、該当フレームを再生成するか台本を直してから次の工程に進む。
 - 保存先は必ず `03_SCRIPTS/<NN>_<slug>/` 配下。
 - ユーザーからストーリーを渡された際は、台本・Seedanceプロンプト作成に続けて、このルール（クリップごとに開始＋終了の2枚、前フレームを種にチェーン、キャラ参照を必ず添付、つなぎ目は共有）に沿ってキーフレームも生成する。
 
@@ -315,6 +336,7 @@ codex exec -s workspace-write --enable image_generation \
 - **開始/終了フレームは必ず両方セット**する。片方だけだと単一フレームからの外挿になりブレやすい。
 - **Motion promptは「そのまま貼れる完成形」で書き、実行時の要約・短縮を禁止する。** `script.md`のMotion promptがCapCutに入力される最終文字列そのものであり、生成実行者（人間・エージェント問わず）が独自に圧縮・言い換えしてはならない（過去に要約で開始/終了状態・プロップ・NG変更の制約が欠落し、整合性が崩れた）。プロンプトが長すぎて入らない・守られない場合は、要約するのではなく**台本に戻ってクリップを分割**し、1本あたりの情報量を減らす。
 - **全クリップのMotion promptに画面内テキスト禁止の否定指示を必ず入れる**（ステップ1「画面内テキスト禁止ルール」参照）: "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters; the video must contain no text at all"。台本が画面内文字を指定するクリップは、その文字だけを唯一の例外として明記する。`validate_run_bundle.py`がこの記載（"on-screen text"への言及）を機械検証する。
+- **全クリップのMotion promptに、Scene ledgerの時間帯・光の句を必ず入れる**（ステップ1「Scene ledger」参照）: 例 "bright midday daylight"。場所転換のあるクリップは転換先の時間帯まで明示し、典型絵が別の時間帯の場所には否定形を添える（"it is DAYTIME, NOT night"）。`validate_run_bundle.py`が`## Scene ledger`セクションの存在と、各Motion prompt内の時間帯語（daylight/daytime/midday/night等）を機械検証する。
 - **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。セリフのあるクリップのDurationは**「添付音声の合計長＋約1秒」**を目安にする（ステップ1「リップシンク精度ルール」参照）。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
 - **Reference images表に書いた全ファイルはラン専用ディレクトリ直下に実在しなければならない。** 表だけ書いて実ファイルを同梱しない状態は禁止する。
@@ -361,6 +383,7 @@ Generate ONLY Clip 1, then verify ALL of the following before touching any other
 - [ ] The CORRECT character lip-syncs to each line (the speaker named in the prompt moves their mouth; every non-speaker's mouth stays closed)
 - [ ] Mouth motion starts and ends WITH the audio: the speaker's mouth starts moving when the line starts and stays CLOSED after the line ends (no lip-flap during silence)
 - [ ] Motion, poses and prop states match the Motion prompt and the Prop state ledger
+- [ ] Location, time of day and lighting match the Scene ledger in EVERY frame — no unexplained day-to-night (or night-to-day) jump anywhere in the clip, including during location transitions
 - [ ] NO on-screen text appears that the script did not explicitly call for — no spontaneous subtitles, captions, or Japanese lettering anywhere in the clip
 - [ ] Hinges, handles and other fixture hardware stay on the edges given in the Fixture layout table in EVERY frame (handles never disappear, jump to the hinge side, or duplicate — especially when a door finishes closing)
 - [ ] The clip duration equals the Duration specified in the CapCut inputs table (NOT the ~8s default)
@@ -402,5 +425,6 @@ python3 .claude/skills/seedance/validate_run_bundle.py 03_SCRIPTS/<NN>_<slug>
 - `script.md`が`../../02_CHARACTERS/`等の外部パスを参照していない
 - 各Motion promptに`Required attached reference files:`があり、対応表の全`@ImageN = filename`がファイル名ごと再宣言されている
 - 各クリップのFrame A、Frame B、Audioが存在する
+- `## Scene ledger`セクションが存在し、各Motion promptに時間帯・光の語（daylight/daytime/midday/evening/night等）が含まれている
 
 検証失敗時は不足ファイルをコピーするかプロンプトを修正し、再実行する。**失敗したままユーザーへ完了報告してはいけない。**

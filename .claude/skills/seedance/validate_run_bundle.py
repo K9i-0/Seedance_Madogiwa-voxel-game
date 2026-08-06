@@ -31,6 +31,12 @@ def main() -> None:
     if re.search(r"(?:\.\./)+02_CHARACTERS/", text):
         errors.append("script.md references 02_CHARACTERS outside the run; copy references into the run and use basenames")
 
+    if re.search(r"^##.*\bScene ledger\b", text, re.MULTILINE | re.IGNORECASE) is None:
+        errors.append(
+            "script.md lacks a '## Scene ledger' section "
+            "(location & time-of-day ledger across all clips; prevents unexplained day/night jumps)"
+        )
+
     sections = list(re.finditer(r"^### CapCut inputs \(Clip (\d+)\)\s*$", text, re.MULTILINE))
     if not sections:
         errors.append("no '### CapCut inputs (Clip N)' sections found")
@@ -57,6 +63,17 @@ def main() -> None:
             errors.append(
                 f"Clip {clip}: Motion prompt lacks the no-on-screen-text instruction "
                 '(e.g. "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters")'
+            )
+
+        time_of_day = re.compile(
+            r"\b(daylight|daytime|midday|noon|morning|afternoon|dusk|sunset|golden hour|evening|night|nighttime)\b",
+            re.IGNORECASE,
+        )
+        if prompt and time_of_day.search(prompt) is None:
+            errors.append(
+                f"Clip {clip}: Motion prompt lacks a time-of-day/lighting phrase from the Scene ledger "
+                '(e.g. "bright midday daylight" — without it the model defaults to the location\'s typical '
+                "time of day and the video can jump from day to night)"
             )
 
         for slot, filename in mappings:

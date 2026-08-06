@@ -26,7 +26,7 @@ description: 窓際族物語の動画をクラウドを使わずフルローカ�
 本スキルは`/seedance`のワークフロー構造を継承する。**次のルール群は`.claude/skills/seedance/SKILL.md`に書かれているものをそのまま適用する**（本ファイルには差分だけを書く。作業前に該当セクションを必ず読むこと）:
 
 - **ステップ0（出力ディレクトリ・参照同梱）**: ラン専用ディレクトリ`03_SCRIPTS/<NN>_<slug>/`の命名、キャラクターシート等を物理ファイルとして同梱、basename参照、正典非改変 — すべて同一。
-- **ステップ1（台本作成）**: Story Formula・禁止事項、Prop state ledger、物理整合性ルール、Fixture layout（機構小物）、話者分離（1生成単位1話者）、リップシンク精度（尺≒発話長＋約1秒）、言語ルール（script.mdは英語、セリフのみ日本語）、話者バインディング — すべて同一。「クリップ」を本スキルでは「チャプター」と読み替える。
+- **ステップ1（台本作成）**: Story Formula・禁止事項、Prop state ledger、物理整合性ルール、Scene ledger（場所・時間帯の通し台帳）と場面転換の整合性ルール（昼夜ジャンプ防止）、Fixture layout（機構小物）、話者分離（1生成単位1話者）、リップシンク精度（尺≒発話長＋約1秒）、言語ルール（script.mdは英語、セリフのみ日本語）、話者バインディング — すべて同一。「クリップ」を本スキルでは「チャプター」と読み替える。
 - **ステップ2（セリフ音声）**: 配役の正典は`02_CHARACTERS/VOICE_CAST.md`。Irodori-TTSボイスクローン（そば屋・福ちゃん・やめたろう・おかやまん・よーたん）とVOICEVOX、そば屋のモンスターボイス加工、無音トリム、Dialogue audio表、VOICEVOXクレジット義務 — すべて同一。**スクリプトもseedance同梱のものをそのまま使う**（`irodori_speak.sh` / `voicevox_speak.sh` / `sobaya_monsterize.sh`）。
 
 キーフレーム生成の技法（draw-things-cli固有）は本ファイルのステップ5に完結して書いてある（seedance側がCodex生成のままのバージョンでも本スキル単独で動くようにするため）。
@@ -202,7 +202,7 @@ seedance SKILL.mdステップ0と同一規則。`03_SCRIPTS/<NN>_<slug>/`を作�
 
 ## 3. 台本＋チャプター分割（deliverableは英語の`script.md`）
 
-seedance SKILL.mdステップ1の全ルール（Prop state ledger / Fixture layout / 話者分離 / リップシンク精度 / 言語ルール / 話者バインディング）を適用した上で、クリップの代わりに**チャプター**へ分割する。
+seedance SKILL.mdステップ1の全ルール（Prop state ledger / Scene ledger（場所・時間帯）と場面転換の整合性 / Fixture layout / 話者分離 / リップシンク精度 / 言語ルール / 話者バインディング）を適用した上で、クリップの代わりに**チャプター**へ分割する。
 
 ### チャプターの定義（H3の入力制限が分割の根拠）
 
@@ -310,7 +310,7 @@ python3 .claude/skills/local-video/stitch_refs.py 03_SCRIPTS/<NN>_<slug>/ref_can
 
 .claude/skills/local-video/dt_generate.sh 03_SCRIPTS/<NN>_<slug>/ch1_start.png \
   03_SCRIPTS/<NN>_<slug>/ref_canvas_ch1_start.png 42 1024x576 <<'EOF'
-The input image is a contact sheet of character model sheets — identity/design references only, NOT a composition reference. Using exactly these characters, create the FIRST-FRAME still of a video shot: <START state incl. Prop states and Fixture layout>. <the run's style block>. Single still frame, one coherent scene, no text overlay, no sheet-style panels or labels.
+The input image is a contact sheet of character model sheets — identity/design references only, NOT a composition reference. Using exactly these characters, create the FIRST-FRAME still of a video shot: <START state incl. Prop states, Fixture layout, and the Scene ledger's time-of-day/lighting phrase (e.g. "bright midday daylight")>. <the run's style block>. Single still frame, one coherent scene, no text overlay, no sheet-style panels or labels.
 EOF
 ```
 
@@ -354,12 +354,13 @@ EOF
 1. **1枚絵として成立しているか**（複数パネル・シート化・文字混入・ウォーターマークがない）
 2. **登場キャラ全員のNG要素**（各`02_CHARACTERS/0N_*.md`のNG変更。形の崩れと「丸ごと消える」の両方）
 3. **Prop state ledgerの該当セルとの一致**（グラスの中身・持ち方等）
-4. **Fixture layoutとの一致**（蝶番側・ノブ側・開き方向）
-5. **話者の口の開閉**（セリフのあるチャプター: 話者は口が開き、非話者は閉じている）
-6. **画風の一致**（そのランの画風固定文と合っているか）
+4. **Scene ledgerの該当セルとの一致**（場所と時間帯・光。昼の場面なのに夜景・夜空・点灯した提灯になっていないか等）
+5. **Fixture layoutとの一致**（蝶番側・ノブ側・開き方向）
+6. **話者の口の開閉**（セリフのあるチャプター: 話者は口が開き、非話者は閉じている）
+7. **画風の一致**（そのランの画風固定文と合っているか）
 
 - `verify_frame.py`は`VERDICT: PASS`/`VERDICT: FAIL`＋指摘リストを返す。**FAILだけでなくPASSでも指摘内容を読み、ClaudeもReadで画像を開いて突き合わせる**（VLMの見落とし・誤検出の両方があり得る。最終判断はClaudeが行う）。
-- 隣接フレーム間の整合（つなぎ目共有、金具位置の連続性、状態遷移に対応する動作の有無）はVLMの単画像検証では見えないため、**Prop state ledgerの1行ごとに全フレームを時系列で見比べる最終チェック**をClaudeが行う（動作なしに状態が飛んでいる境界があれば修正リストに載せる）。
+- 隣接フレーム間の整合（つなぎ目共有、金具位置の連続性、状態遷移に対応する動作の有無、時間帯・照明の連続性）はVLMの単画像検証では見えないため、**Prop state ledger・Scene ledgerの1行ごとに全フレームを時系列で見比べる最終チェック**をClaudeが行う（動作なしに状態が飛んでいる境界、画面内の時間経過描写なしに昼夜・光が変わる境界があれば修正リストに載せる）。
 
 ### 6-2. 修正リストを完全確定させる
 
