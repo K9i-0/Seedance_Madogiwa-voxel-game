@@ -1,0 +1,180 @@
+{
+  "119": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_video_vae_fp16.safetensors"
+    }
+  },
+  "120": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "minimax_h3_audio_vae_fp32.safetensors"
+    }
+  },
+  "127": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "minimax_h3_fl2va_pruned_int8_convrot.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "128": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "qwen3vl_32b_minimax_h3_int8_convrot.safetensors",
+      "type": "minimax",
+      "device": "default"
+    }
+  },
+  "129": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 1005
+    }
+  },
+  "123": {
+    "class_type": "KSamplerSelect",
+    "inputs": {
+      "sampler_name": "res_multistep"
+    }
+  },
+  "124": {
+    "class_type": "BasicScheduler",
+    "inputs": {
+      "model": [
+        "127",
+        0
+      ],
+      "scheduler": "simple",
+      "steps": 20,
+      "denoise": 1
+    }
+  },
+  "126": {
+    "class_type": "BasicGuider",
+    "inputs": {
+      "model": [
+        "127",
+        0
+      ],
+      "conditioning": [
+        "136",
+        0
+      ]
+    }
+  },
+  "125": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "129",
+        0
+      ],
+      "guider": [
+        "126",
+        0
+      ],
+      "sampler": [
+        "123",
+        0
+      ],
+      "sigmas": [
+        "124",
+        0
+      ],
+      "latent_image": [
+        "136",
+        1
+      ]
+    }
+  },
+  "122": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ]
+    }
+  },
+  "121": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "samples": [
+        "125",
+        0
+      ],
+      "vae": [
+        "120",
+        0
+      ]
+    }
+  },
+  "130": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "122",
+        0
+      ],
+      "audio": [
+        "121",
+        0
+      ],
+      "fps": 24,
+      "bit_depth": 8
+    }
+  },
+  "92": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "130",
+        0
+      ],
+      "filename_prefix": "video/ch5",
+      "format": "auto"
+    }
+  },
+  "200": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "ch5_start.png"
+    }
+  },
+  "201": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "ch5_end.png"
+    }
+  },
+  "136": {
+    "class_type": "MiniMaxH3ImageToVideo",
+    "inputs": {
+      "clip": [
+        "128",
+        0
+      ],
+      "vae": [
+        "119",
+        0
+      ],
+      "prompt": "The video starts EXACTLY on the first frame and ends EXACTLY on the last frame. One continuous shot in bright midday light. The tiny matte 3D chibi figure Yametaro sits upright in his chair with his palms pressed flat together, finishing a prayer; he opens his small round eyes, then slowly tips his oversized head back and looks up and out through the floor-to-ceiling window with his eyebrows raised in genuine puzzlement, because the sun is still high in the sky. He holds that puzzled upward look on the final frame. His mouth stays CLOSED the entire time: no speech, no lip movement, no narration, ambient room tone only. Meanwhile, in the mid-background on frame left, Fukuchan — the slim, stylish 170cm black-haired man in a loose black long coat over a white graphic T-shirt with a lanyard name tag — walks calmly into frame, stops a few steps behind Yametaro and stands there smiling warmly, holding a smartphone with a completely DARK screen down at his side. Fukuchan does NOT speak: his mouth stays CLOSED and he only watches. Fukuchan keeps his loose black long coat, white graphic T-shirt, white sneakers and lanyard name tag — NOT a suit, and the lanyard does NOT disappear. Fukuchan is rendered as a real photographed person and is far taller than Yametaro, whose head only reaches Fukuchan's hip. Yametaro's glasses stay SMALL, ROUND and WHITE-RIMMED in every frame — NOT rectangular, NOT thick dark-rimmed — and they do NOT disappear; his black bowl-cut hair, pink blush cheeks and purple patterned shirt stay exactly as they are. The paper spec booklet stays CLOSED with its thin film of dust and is never opened or touched. The laptop screen keeps exactly ONE single red error banner — an abstract solid red horizontal bar with NO readable text — and does not multiply in this chapter. The laptop lid stays OPEN at a constant ~100° with its hinge on the REAR edge away from camera. The EMPTY glass beer mug stays EMPTY and untouched, nobody drinks, lifts or pours anything, exactly three crushed cans stay unchanged, and the cardboard tray stays EMPTY. The window wall has no hinge, handle or latch. Photorealistic live-action-style cinematic scene, real office materials and real daylight, with Yametaro alone rendered as a soft matte 3D chibi toy figure lit by that same real light — NOT flat 2D anime, NOT cartoon lineart. No readable text, no letters, no captions, no watermark anywhere in frame. Friendly, curious, comedic mood.",
+      "width": 1344,
+      "height": 768,
+      "length": 175,
+      "first_frame": [
+        "200",
+        0
+      ],
+      "last_frame": [
+        "201",
+        0
+      ]
+    }
+  }
+}
