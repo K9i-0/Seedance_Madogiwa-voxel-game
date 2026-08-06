@@ -1,8 +1,13 @@
 #!/bin/bash
 # Irodori-TTS（ゼロショットボイスクローン）でセリフ音声(wav)を1つ生成する
-# 使い方: irodori_speak.sh "セリフテキスト" 出力ファイル.wav 参照音声.wav [シード値]
+# 使い方: irodori_speak.sh "セリフテキスト" 出力ファイル.wav 参照音声.wav [シード値] [話速倍率] [尺秒数]
 # 参照音声はキャラごとに 02_CHARACTERS/VOICE_CAST.md（正典）で指定された <キャラ>_voice.wav を使う。
 # 事前学習は不要（毎回の合成時に参照音声を渡すゼロショット方式）。
+# 話速倍率は 1.0=等速、1.2=1.2倍速（内部で infer.py の --duration-scale=1/倍率 に変換。
+# モデル自体が早口で生成するためピッチは変わらない。省略時はモデルの予測尺のまま）。
+# 尺秒数を指定すると生成尺（キャンバス長）をその秒数に固定する（--seconds。話速倍率より優先）。
+# 短いセリフはモデルの尺予測が長すぎて話速倍率が効かないことがあるため、その場合は
+# 「等速テイクの実測長 ÷ 倍率」をここで直接指定する（話速倍率の位置は "" で飛ばす）。
 # Irodori-TTS本体の設置場所は IRODORI_TTS_DIR（既定: ~/irodori_tts）。
 set -eu
 
@@ -10,6 +15,8 @@ TEXT="${1:?セリフテキストを指定してください}"
 OUT="${2:?出力wavパスを指定してください}"
 REF="${3:?参照音声wavを指定してください（02_CHARACTERS/VOICE_CAST.md参照）}"
 SEED="${4:-}"
+SPEED="${5:-}"
+FIXSEC="${6:-}"
 TTS_DIR="${IRODORI_TTS_DIR:-$HOME/irodori_tts}"
 
 [ -f "$REF" ] || { echo "ERROR: 参照音声が見つかりません: $REF" >&2; exit 1; }
@@ -32,12 +39,23 @@ esac
 SEED_ARGS=()
 [ -n "$SEED" ] && SEED_ARGS=(--seed "$SEED")
 
+SPEED_ARGS=()
+if [ -n "$FIXSEC" ]; then
+  python3 -c "s=float('$FIXSEC'); assert s>0" \
+    || { echo "ERROR: 尺秒数が不正です: $FIXSEC" >&2; exit 1; }
+  SPEED_ARGS=(--seconds "$FIXSEC")
+elif [ -n "$SPEED" ]; then
+  DS=$(python3 -c "s=float('$SPEED'); assert s>0; print(f'{1/s:.4f}')") \
+    || { echo "ERROR: 話速倍率が不正です: $SPEED" >&2; exit 1; }
+  SPEED_ARGS=(--duration-scale "$DS")
+fi
+
 (cd "$TTS_DIR" && uv run --no-sync python infer.py \
   --hf-checkpoint Aratako/Irodori-TTS-500M-v3 \
   --text "$TEXT" \
   --ref-wav "$REF" \
   --output-wav "$OUT" \
-  "${SEED_ARGS[@]}" >&2)
+  ${SEED_ARGS[@]+"${SEED_ARGS[@]}"} ${SPEED_ARGS[@]+"${SPEED_ARGS[@]}"} >&2)
 
 head -c 4 "$OUT" | grep -q RIFF || { echo "ERROR: 合成に失敗しました（上のログ参照）" >&2; rm -f "$OUT"; exit 1; }
 
@@ -56,4 +74,4 @@ import wave
 w = wave.open('$OUT')
 print(f'{w.getnframes()/w.getframerate():.2f}')
 ")
-echo "OK: $OUT (${DUR}s, ref=$(basename "$REF")${SEED:+, seed=$SEED})"
+echo "OK: $OUT (${DUR}s, ref=$(basename "$REF")${SEED:+, seed=$SEED}${SPEED:+, speed=${SPEED}x}${FIXSEC:+, seconds=$FIXSEC})"

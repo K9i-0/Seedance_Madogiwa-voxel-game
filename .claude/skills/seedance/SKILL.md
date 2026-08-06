@@ -10,7 +10,7 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 1. このラン専用の出力ディレクトリを作成する
 2. **使用する全キャラクターシート・スケール参照画像をラン専用ディレクトリへ実ファイルとしてコピーする**
 3. 台本＋Seedanceプロンプト（英語）の作成（各クリップに開始状態と終了状態を明記する）
-4. VOICEVOX/Irodori-TTSによる全セリフの音声生成
+4. VOICEVOX/Irodori-TTSによる全セリフの音声候補生成（等速＋1.5倍速の2テイク）→ユーザーが聴いて採用テイクを確定→最終ファイル作成（確認が取れるまで次の工程へ進まない）
 5. Codexによる各クリップのキーフレーム生成（**開始フレーム＋終了フレームの2枚**を作る）
 6. Seedanceへの入力対応表と、各Motion prompt内の添付宣言を`script.md`に明記する
 7. 生成実行プロトコルを明記し、同梱物の機械検証を通す
@@ -135,6 +135,15 @@ Seedanceは「話す」と指示されたキャラの口を**クリップ全体�
 
 理由: 日本語の説明文はSeedanceでの再現精度が落ちること、および成果物を言語横断で扱いやすくするため。
 
+### 画面内テキスト禁止ルール（勝手な字幕・日本語表示の防止・重要）
+
+Seedanceはプロンプト内の日本語セリフ引用や添付音声につられて、**指示していない字幕・キャプション・日本語（風）の文字を勝手に画面へ描画する**ことがある。これを防ぐため:
+
+- **画面内に表示してよい文字は、台本が明示的に指定したものだけ**（例: 温度計の「43℃」）。それ以外の文字（字幕・テロップ・キャプション・カラオケ風歌詞・崩れた擬似日本語）は一切描画させない。
+- **全クリップのMotion promptに、次の否定指示を必ず入れる**: "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters; the video must contain no text at all"。画面内文字を台本が指定するクリップだけ、その文字を唯一の例外として明記する（例: "the ONLY text allowed on screen is 43℃ on the thermometer — render no other text, no subtitles, no captions"）。
+- キーフレーム生成プロンプトの "no text overlay"（ステップ3）と、参照シートの文字ラベルを漏らさない指示（ステップ4）もこの方針の一部であり省略しない。
+- 字幕・クレジットなど意図的なテキストが必要な場合はSeedanceに描かせず、**CapCutのテキスト機能で後載せする**（VOICEVOXクレジットと同じ扱い）。
+
 ### セリフ音声の扱い（Seedanceの発声禁止・音声添付必須・重要）
 
 **キャラクターのセリフ・ナレーションの音声は、すべてステップ2で生成した音声ファイル（キャラごとにVOICEVOXまたはIrodori-TTS。配役は`VOICE_CAST.md`が正）が正**であり、Seedanceに声を生成させない（生成音声と重なると二重音声になるため）。セリフのあるクリップで音声生成を省略してSeedance任せにすることは禁止。ユーザーから別途音声ファイルが渡された場合は、そのクリップに限りユーザー提供の音声を優先する。
@@ -154,9 +163,11 @@ Seedanceは「話す」と指示されたキャラの口を**クリップ全体�
 - `script.md` のCapCut inputs表に `Audio` 行を追加し、添付する音声ファイル名と「Seedance生成の入力として添付し、そのまま使わせる」ことを明記する（記載例は後述）。
 - **添付音声は「生成時の参照」で終わらせない。** 生成時に添付してもSeedanceが参照音声として扱い、最終動画に元音声が乗らない事故が起きた。**最終的な音声の正は、CapCutタイムライン上に明示的に並べ直したローカルwav**とする（生成クリップに埋め込まれた音声はミュートして差し替える）。手順はステップ5「生成実行プロトコル」で必ず`script.md`に記載する。
 
-## 2. セリフ音声の生成（全セリフ必須）
+## 2. セリフ音声の生成（全セリフ必須・2段階）
 
 台本が完成したら、**台本中のすべてのセリフ・ナレーションの音声をローカルで生成し、ラン専用ディレクトリに保存する**。このwavはSeedance（CapCut）生成時に添付ファイルとして渡し、動画にそのまま使わせる（Seedanceの生成音声は使わない）。
+
+音声は**2段階**で作る: まず各セリフの候補として**等速と1.5倍速の2テイク**を生成してユーザーに聴いて選んでもらい、**採用テイクが確定してから**最終ファイル（正式名のwav）を用意する。**ユーザーの確認が取れるまで、最終ファイルの作成と以降の工程（キーフレーム生成・CapCut入力表の完成）へ進んではいけない**（クリップ尺Durationは採用音声の実測長に依存するため、先に進むと手戻りになる）。
 
 ### 配役（正典）
 
@@ -165,13 +176,13 @@ Seedanceは「話す」と指示されたキャラの口を**クリップ全体�
 - それ以外のキャラはVOICEVOXで生成する。感情差分スタイルはシーンに合わせてVOICE_CAST.mdの範囲で選んでよい。
 - **ゆめみんは言葉を話さない**設定のため、台本にセリフ（言葉）を書かない。鳴き声（「きゅー！」「ぼんっ！」等）が必要な場合はVOICE_CAST.mdの指定voice（ずんだもん）で鳴き声テキストを生成する。
 
-### 生成手順
+### 生成手順 — フェーズ1: 候補生成（等速＋1.5倍速）
 
-1クリップ内のセリフ1つ（1人の連続した発話）につき1ファイル生成する。エンジンに応じて同梱スクリプトを使い分ける:
+1クリップ内のセリフ1つ（1人の連続した発話）につき、まず**等速と1.5倍速の2候補**を生成する。候補ファイル名は`clipN_lineM_<char>_1.0x.wav` / `clipN_lineM_<char>_1.5x.wav`。エンジンに応じて同梱スクリプトを使い分ける:
 
 ```
 # Irodori-TTSのキャラ（そば屋・福ちゃん・やめたろう・おかやまん・よーたん）
-.claude/skills/seedance/irodori_speak.sh "セリフテキスト" 03_SCRIPTS/<NN>_<slug>/clipN_lineM_<char>.wav 02_CHARACTERS/<キャラ>_voice.wav
+.claude/skills/seedance/irodori_speak.sh "セリフテキスト" 03_SCRIPTS/<NN>_<slug>/clipN_lineM_<char>.wav 02_CHARACTERS/<キャラ>_voice.wav [シード値] [話速倍率]
 
 # そば屋のみ: クローン生成後にモンスターボイス加工を必ずかける（in-place。VOICE_CAST.md参照）
 .claude/skills/seedance/sobaya_monsterize.sh 03_SCRIPTS/<NN>_<slug>/clipN_lineM_sobaya.wav
@@ -180,13 +191,31 @@ Seedanceは「話す」と指示されたキャラの口を**クリップ全体�
 .claude/skills/seedance/voicevox_speak.sh "セリフテキスト" 03_SCRIPTS/<NN>_<slug>/clipN_lineM_<char>.wav <スタイルID> [話速]
 ```
 
+- **等速候補**: 既定シードで生成し、出力される実測長（トリム後）を控える。
+- **1.5倍速候補**: Irodori-TTSは話速倍率（duration-scale）ではなく**第6引数の尺直指定**で作る（短文では尺予測の余りが大きく、倍率だと等速より長い間延びテイクになることがあるため）。指定値は **`(等速実測長 − 0.3) ÷ 1.5 ＋ 0.3` 秒**（トリムが残す前後の無音約0.3秒は速度に関係なく一定なので、発話部分だけを1.5倍速換算する。例: 等速1.22秒 → 0.91秒）。VOICEVOXは第4引数の話速`1.5`で作る。
+- **語尾切れチェック**: 1.5倍速候補は末尾が自然に減衰して終わっているか確認する（波形末尾の音量がおおむね-40dBまで落ちて終わっているか。大きい音のまま終わっていたら語尾が切れているので、尺を+0.05〜0.1秒して再生成する）。
+- そば屋は両候補ともmonsterize加工まで済ませてから提示する（正典の声は加工後のため）。
 - VOICEVOXはエンジン未起動なら自動起動する（設置場所は`~/voicevox_engine/`）。Irodori-TTSは`~/irodori_tts`に設置済みであること（無いマシンではスクリプトのエラーメッセージに従う。1文あたり数十秒〜数分かかる）。
 - 両スクリプトは合成後に**前後の無音を自動トリム**する（先頭約0.1秒・末尾約0.2秒だけ残す。長い無音はSeedanceの口パク開始位置を狂わせるため）。Dialogue audio表に記録する再生時間はトリム後の値を使う。
-- **ファイル名**: `clipN_lineM_<char>.wav`（N=クリップ番号、M=クリップ内の発話順、char=キャラ名小文字。例: `clip1_line2_sobaya.wav`）。台本ファイル・画像と同じ階層に置く。
+- **ファイル名**: 候補は`clipN_lineM_<char>_1.0x.wav` / `clipN_lineM_<char>_1.5x.wav`、確定後の最終ファイルは`clipN_lineM_<char>.wav`（N=クリップ番号、M=クリップ内の発話順、char=キャラ名小文字。例: `clip1_line2_sobaya.wav`）。台本ファイル・画像と同じ階層に置く。
 - 生成テキストは**実際に発話される日本語のセリフそのまま**を渡す（英訳やローマ字にしない）。イントネーションがおかしい場合は読み仮名に直したテキストで再生成してよい（台本上の表記は変えない）。
 - Irodori-TTSは生成ごとに揺らぎがある。**再生成して選び直したいときはシード値（第4引数）を変えて数候補作る**。良い結果のシードは`script.md`のDialogue audio表に記録しておくと再現できる。
-- スクリプトが出力する**再生時間（秒）を`script.md`のDialogue audio表に記録する**。クリップ尺はセリフの合計時間より長くしつつ、**「音声wavの合計長＋約1秒」を目安に詰める**（ステップ1「リップシンク精度ルール」参照）。尺に収まらない場合はクリップを延ばすか、VOICEVOXは話速を上げる。
+- **Irodori-TTSの話速は第5引数の倍率で調整できる**（1.0=等速、1.2=1.2倍速。内部で`infer.py`の`--duration-scale=1/倍率`に変換され、モデル自体が早口で生成するためピッチは変わらない）。テンポの良い掛け合いは1.2前後が目安。1.5以上は不自然になりやすいので、聴いて確認してから採用する。使った倍率はシードと同様にDialogue audio表へ記録する（例: `seed 42, speed 1.2x`）。
+- **短いセリフは話速倍率が効かない（等速より長くなる）ことがある**。倍率はモデルが予測した生成尺に掛かるため、短文で尺予測が実発話より大幅に長いと、縮めた後の尺でもまだ余白があり、モデルが間延びした別テイクで埋めてしまう。その場合（および1.5倍速候補を作るとき）は**第6引数で尺（秒）を直接指定する**（`--seconds`に渡り、話速倍率より優先。第5引数は`""`で飛ばす）。指定値は **`(等速実測長 − 0.3) ÷ 欲しい倍率 ＋ 0.3` 秒**。例: 等速1.22秒を1.5倍速にする → `irodori_speak.sh "セリフ" out.wav ref.wav 7 "" 0.91`。使った尺はDialogue audio表へ記録する（例: `seed 7, seconds 0.91`）。
+- スクリプトが出力する**再生時間（秒）を`script.md`のDialogue audio表に記録する**。クリップ尺はセリフの合計時間より長くしつつ、**「音声wavの合計長＋約1秒」を目安に詰める**（ステップ1「リップシンク精度ルール」参照）。尺に収まらない場合はクリップを延ばすか、話速を上げる（VOICEVOXは第4引数、Irodori-TTSは第5引数）。
 - 生成後、各wavを再生確認できない環境でも、少なくとも全ファイルの存在と再生時間の妥当性（0.5秒未満や異常に長いものがないか）を確認する。
+
+### 生成手順 — フェーズ2: ユーザー確認（必須ゲート）
+
+- 全セリフの候補（等速＋1.5倍速）が揃ったら、候補wavを**ユーザーが聴ける形で提示し**（ファイル送付等）、セリフごとにどちらを採用するか確認する。提示時はセリフ・キャラ・速度・実測長の一覧を添える。
+- 別の速度（1.2倍等）・別シードの要望が出たら、追加候補を生成して再提示する。
+- **採用テイクの確認が取れるまで、正式名の最終ファイル作成・キーフレーム生成（ステップ3）・CapCut入力表の完成（ステップ4）へ進んではいけない。**
+
+### 生成手順 — フェーズ3: 確定（最終ファイルの用意）
+
+- 採用テイクを正式名 `clipN_lineM_<char>.wav` にコピーして最終ファイルとする。
+- Dialogue audio表には**採用テイクのパラメータ（seed、speedまたはseconds）と実測長**を記録する（例: `Irodori-TTS (ref: Yametaro_voice.wav, seed 7, seconds 0.91)`）。
+- 不採用の候補ファイル（`_1.0x.wav` / `_1.5x.wav`）はラン専用ディレクトリから削除する（CapCut入力表が参照しないファイルを成果物に残さない）。
 
 ### script.mdへの記載（Dialogue audio表・必須）
 
@@ -285,6 +314,7 @@ codex exec -s workspace-write --enable image_generation \
 
 - **開始/終了フレームは必ず両方セット**する。片方だけだと単一フレームからの外挿になりブレやすい。
 - **Motion promptは「そのまま貼れる完成形」で書き、実行時の要約・短縮を禁止する。** `script.md`のMotion promptがCapCutに入力される最終文字列そのものであり、生成実行者（人間・エージェント問わず）が独自に圧縮・言い換えしてはならない（過去に要約で開始/終了状態・プロップ・NG変更の制約が欠落し、整合性が崩れた）。プロンプトが長すぎて入らない・守られない場合は、要約するのではなく**台本に戻ってクリップを分割**し、1本あたりの情報量を減らす。
+- **全クリップのMotion promptに画面内テキスト禁止の否定指示を必ず入れる**（ステップ1「画面内テキスト禁止ルール」参照）: "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters; the video must contain no text at all"。台本が画面内文字を指定するクリップは、その文字だけを唯一の例外として明記する。`validate_run_bundle.py`がこの記載（"on-screen text"への言及）を機械検証する。
 - **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。セリフのあるクリップのDurationは**「添付音声の合計長＋約1秒」**を目安にする（ステップ1「リップシンク精度ルール」参照）。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
 - **Reference images表に書いた全ファイルはラン専用ディレクトリ直下に実在しなければならない。** 表だけ書いて実ファイルを同梱しない状態は禁止する。
@@ -331,6 +361,7 @@ Generate ONLY Clip 1, then verify ALL of the following before touching any other
 - [ ] The CORRECT character lip-syncs to each line (the speaker named in the prompt moves their mouth; every non-speaker's mouth stays closed)
 - [ ] Mouth motion starts and ends WITH the audio: the speaker's mouth starts moving when the line starts and stays CLOSED after the line ends (no lip-flap during silence)
 - [ ] Motion, poses and prop states match the Motion prompt and the Prop state ledger
+- [ ] NO on-screen text appears that the script did not explicitly call for — no spontaneous subtitles, captions, or Japanese lettering anywhere in the clip
 - [ ] Hinges, handles and other fixture hardware stay on the edges given in the Fixture layout table in EVERY frame (handles never disappear, jump to the hinge side, or duplicate — especially when a door finishes closing)
 - [ ] The clip duration equals the Duration specified in the CapCut inputs table (NOT the ~8s default)
 If any check fails, fix the inputs/prompt and regenerate Clip 1 until all pass.

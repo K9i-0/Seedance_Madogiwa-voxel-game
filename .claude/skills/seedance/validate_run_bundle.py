@@ -53,6 +53,12 @@ def main() -> None:
         if mappings and "Required attached reference files:" not in prompt:
             errors.append(f"Clip {clip}: Motion prompt lacks 'Required attached reference files:'")
 
+        if prompt and "on-screen text" not in prompt.lower():
+            errors.append(
+                f"Clip {clip}: Motion prompt lacks the no-on-screen-text instruction "
+                '(e.g. "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters")'
+            )
+
         for slot, filename in mappings:
             if Path(filename).name != filename:
                 errors.append(f"Clip {clip}: @Image{slot} must use a bundled basename, not path: {filename}")
