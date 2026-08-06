@@ -9,6 +9,43 @@
 #   OLLAMA_VLM    画像検証に使うVLMモデル（デフォルト: qwen3-vl:32b）
 set -uo pipefail
 
+# ---- Platform gate: H3 video generation requires NVIDIA CUDA ----------------
+# Measured 2026-08 on M1 Pro/32GB: ALL four weight variants fail on Apple Silicon
+#   int8_convrot -> aten::_int_mm has no MPS kernel (no fallback in comfy_kitchen)
+#   fp8_scaled   -> Float8_e4m3fn dtype undefined on MPS
+#   nvfp4_awq    -> NVIDIA-only quantisation
+#   bf16         -> MPS OOM at 41.8/42.4 GiB even at 90 frames / 640x384 / 2 steps
+# Check this BEFORE downloading ~130GB of weights.
+if [ "$(uname -s)" = "Darwin" ]; then
+  echo
+  echo "================================================================"
+  echo " WARNING: this machine is macOS / Apple Silicon."
+  echo " MiniMax H3 VIDEO GENERATION (step 7) CANNOT RUN HERE."
+  echo " Do NOT download the H3 weights on this machine expecting to"
+  echo " generate video with them (~130GB for all variants)."
+  echo
+  echo " What DOES work locally on Apple Silicon:"
+  echo "   step 3 script / step 4 Irodori-TTS+VOICEVOX audio /"
+  echo "   step 5 draw-things-cli keyframes (~16-17 min/frame on M1 Pro) /"
+  echo "   step 6 Qwen3-VL verification / step 8 ffmpeg assembly"
+  echo
+  echo " Recommended: finish steps 1-6 here, build the portable input"
+  echo " bundle, and run step 7 on a CUDA machine."
+  echo " See the 'Macで動く工程 / CUDAが必要な工程' section in SKILL.md"
+  echo " and 03_SCRIPTS/26_kansha_no_bug_ichimankai/RUNBOOK_CUDA.md"
+  echo "================================================================"
+  echo
+  IS_DARWIN=1
+else
+  IS_DARWIN=0
+  if command -v nvidia-smi >/dev/null 2>&1; then
+    echo "== GPU =="
+    nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>/dev/null
+  else
+    echo "WARNING: nvidia-smi not found. MiniMax H3 needs an NVIDIA CUDA GPU for step 7."
+  fi
+  echo
+fi
 COMFYUI_DIR="${COMFYUI_DIR:-$HOME/ComfyUI}"
 OLLAMA_VLM="${OLLAMA_VLM:-qwen3-vl:32b}"
 MISSING=0
@@ -57,7 +94,7 @@ if [ "$MISSING" -ne 0 ]; then
                 "diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors" \
                 "vae/*" \
       --local-dir ~/ComfyUI/models
-  テキストエンコーダは Apple Silicon では NVFP4 版ではなく INT8/bf16 版を選ぶこと
+  テキストエンコーダはGPU世代で選ぶ（Blackwell=NVFP4 / Ada,Hopper,Ampere=INT8 / VRAM 80GB+=bf16）。Apple SiliconではどのバリアントもH3を実行できない
   （https://huggingface.co/Comfy-Org/MiniMax-H3/tree/main/text_encoders で最新のファイル名を確認）。
 MSG
 fi

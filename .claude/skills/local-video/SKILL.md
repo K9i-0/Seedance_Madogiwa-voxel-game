@@ -41,6 +41,71 @@ description: 窓際族物語の動画をクラウドを使わずフルローカ�
 
 このスクリプトは必要コンポーネントの導入状態を確認し、**未導入のものについて公式ドキュメントに基づく導入手順を表示する**。未導入があれば、表示された手順（および下記の公式ドキュメント）に従って導入してから先へ進む。モデルのダウンロードは数十GB規模なので、開始前にユーザーへ所要サイズを伝えて確認する。
 
+### 動作環境の前提（重要・実測で確定）
+
+**MiniMax H3の動画生成にはNVIDIA CUDA GPUが必要。Apple Silicon（MPS）では実行できない。** 2026年8月にM1 Pro / 32GBで4バリアントすべてを実際に走らせて確認した結果:
+
+| バリアント | サイズ | MPSでの結果 |
+|---|---|---|
+| `*_pruned_int8_convrot` | 21GB | ❌ `NotImplementedError: aten::_int_mm` — MPSにカーネルが無い。ComfyUIの`comfy_kitchen/backends/eager/quantization.py`の`int8_linear`→`fast_int8_mm`が`torch._int_mm`を直接呼び、**フォールバック経路が無い** |
+| `*_pruned_fp8_scaled` | 21GB | ❌ `RuntimeError: Undefined type Float8_e4m3fn` — MPSにfloat8型自体が無い（dequantizeがbf16を返す設計でも、入力のfp8テンソルを扱えない） |
+| `qwen3vl_32b_..._nvfp4_awq` | 16GB | ❌ NVIDIA専用量子化 |
+| `*_pruned_bf16` | 40GB | ❌ MPSネイティブ型なので実行は始まるが `MPS backend out of memory (allocated 41.80 GiB, max allowed 42.43 GiB)`。**最小設定（90フレーム・640x384・2ステップ）でも超過**。PyTorchのMPS上限は物理RAMの約1.33倍で、40GBのDiT単体でほぼ使い切る |
+
+- モデルのロード自体は毎回成功する（エンコーダ25.9GB・DiT 20〜40GB）。**容量の問題ではなく、PyTorch MPSバックエンドの型/オペレータ非対応**なので、ComfyUIの起動オプションでは回避できない。
+- `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0`で上限を外す案はPyTorch自身が「システム障害の可能性」と警告しており、かつ最小設定で既に超過しているため実チャプター（4.2倍のピクセル・最大3.6倍のフレーム）では無意味。**ユーザーの明示的な依頼が無い限り試さない。**
+- **Macで作業する場合は工程を分割する**（下記「Macで動く工程 / CUDAが必要な工程」）。131GBの重みを落としてから気づくのを避けるため、**H3の重みダウンロードを始める前にGPUを確認する**こと。
+
+#### ただしComfyUI経路が駄目でも「Macで不可能」と即断しない（重要な手順）
+
+上表の失敗は**ComfyUI + PyTorch MPS + Comfy-Org版リパック**という1経路の話であって、H3自体がApple Siliconで動かないという意味ではない。**この経路で詰まったら、必ず代替ランタイムの有無をWeb検索で確認する。** 動画生成モデルのローカル対応は数日単位で動くため、スキルに書いてある構成が最新とは限らない。
+
+2026-08時点で確認できた代替経路:
+
+| 経路 | 状況 | 常駐メモリ |
+|---|---|---|
+| **MLXポート**（`PipeNetwork/minimax-h3-mlx`、2026-08-04公開） | Apple純正MLXで動くのでMPSの型/オペレータ問題を回避。**t2vaのみend-to-end検証済み**、FL2VAは実装済み・未テスト | 4-bit **11.5GB** / 8-bit 21.5GB / bf16 40.3GB（5秒クリップのピーク活性は約9.3GB） |
+| **Ref2VA専用MLXパッケージ**（`gabrielrocco/MiniMax-H3-Ref2VA-MLX-Serve-4bit`） | リップシンク用。画像9・動画3・音声3・計12の上限はH3本来の仕様と一致 | 4-bit |
+| **4-bit + DiffSynth-Studio** | 最小8GB VRAMを称する | — |
+| **Draw Things**（Apple Silicon最適化） | **H3は未収録**。ただしWan 2.1/2.2のT2V/I2Vが5〜6bit量子化まで揃っている（音声・リップシンクは無し） | モデル次第 |
+
+##### Draw Things / Wan の実測（2026-08・M1 Pro 32GB）
+
+H3の代わりにApple Siliconネイティブで回る候補としてWanを実測した。**モデル系統の選択が結果を決める**:
+
+| モデル | 解像度・尺 | 所要 | 結果 |
+|---|---|---|---|
+| `wan_2.1_1.3b_v1.1_fun_inp_f16` | 512x512・49f(3.06s) | **12分8秒**（30.4秒/step×20） | 場景・プロップ状態を保持し、**指示した動作（合掌）も再現**。ただし**キャラデザインがフレーム進行で崩壊**（髪が変形、丸メガネが溶ける）。16:9指定しないとセンタークロップされる |
+| `wan_v2.2_5b_ti2v_q8p` | 1024x576・49f(2.04s) | **17分11秒**（40.7秒/step×20） | **失敗**。全体がぼやけ、窓・箱・暖簾・提灯が消えて無地の壁になり、顔とメガネが溶けた |
+
+- **`Fun InP`系を選ぶ。`TI2V`系に`--image`を渡すのはimg2img扱いで、入力画像の場景が破壊される**（上表の差はこれで説明できる）。Draw Things CLIは適用設定を出力しないため、strengthの既定値は確認できなかった。
+- **1.3Bはキャラ同一性を保てない**。NG変更対象（メガネ・髪型）があるIPでは使えない。品質が要るなら`wan_2.1_14b_v1.1_fun_inp_q6p_svd`（14B・6bit SVDQuant）だが、1.3B比で1桁重くなるため所要時間の見積もりを先に出すこと。
+- **`--width`/`--height`を必ず指定する**（64の倍数）。省略すると正方形にセンタークロップされ構図が失われる。
+- **Wanにはリップシンク機能が無い。** セリフのあるチャプター（R2V相当）はWanでは作れない。音声入力なしのI2Vチャプターのみが対象。
+
+- MLX版は**重みの形式がComfyUI版と違う**ため再ダウンロードが必要（オリジナルのVideo VAE 10.4GB＋Audio VAE 0.6GB＋50層truncated Qwen3-VL-32Bエンコーダ＋MLX量子化transformer）。ComfyUI版を消してから入れ直すことになるので、**どちらの経路で行くかを決めてからダウンロードを始める**。
+- 速度の実測参考値: **M5 Maxで1本約45分**。世代が古いMacは数倍かかる（M1 Proなら1チャプター3〜4.5時間の見込み）。11チャプター規模だと連続数十時間になるため、**本番投入の前に必ず最短チャプター1本でパイロットを回す**。
+- 音声は「プロンプトガイドを読まないと speech-like garbage になる」と報告がある。**リップシンクが要件のランでは、この1点を最優先で検証する。**
+
+#### チャプター単位で必要なモードを見極める（H3が全チャプターに必要とは限らない）
+
+**セリフの無いチャプターはI2V（音声入力なし）＝ナレーションはffmpegで後載せ**なので、リップシンク機能を持たないモデルでも代替できる。実例として`26_kansha_no_bug_ichimankai`は11チャプター中**9本がI2V・2本だけがR2V**だった。H3が本当に必要なのはR2Vの2本だけで、残り9本はApple Siliconでネイティブに速く回る他の動画モデル（Draw ThingsのWan等）で作れる可能性がある。**「H3が動かない＝全部作れない」ではないので、モードごとに切り分けて検討する。**
+
+### Macで動く工程 / CUDAが必要な工程
+
+Apple SiliconでもH3以外は全部ローカルで完結する。実測で確認済み:
+
+| 工程 | Mac（Apple Silicon） | 備考 |
+|---|---|---|
+| 台本作成（ステップ3） | ✅ | 計算不要 |
+| Irodori-TTS / VOICEVOX音声（ステップ4） | ✅ | 動作確認済み |
+| draw-things-cliキーフレーム（ステップ5） | ✅ | M1 Pro / 1024x576 / 20stepで**約16〜17分/枚** |
+| Qwen3-VL画像検証（ステップ6） | ✅ | 32GB機では`qwen3-vl:8b`（32bは載らない） |
+| **H3動画生成（ステップ7）** | ❌ **CUDA必須** | 上表のとおり |
+| ffmpeg結合（ステップ8） | ✅ | |
+
+Macで進める場合は、ステップ6まで仕上げて**ポータブルな入力バンドル**（`script.md`＋音声＋検証済みキーフレーム＋チャプター別ワークフローJSON＋手順書）を作り、ステップ7以降をCUDA機で実行する。実例と手順書のテンプレートは`03_SCRIPTS/26_kansha_no_bug_ichimankai/RUNBOOK_CUDA.md`を参照。
+
 必要コンポーネントと公式ドキュメント:
 
 | コンポーネント | 用途 | 公式ドキュメント |
@@ -64,22 +129,71 @@ ComfyUIを最新（v0.30.0+）に更新した上で、`Comfy-Org/MiniMax-H3`か�
 | `minimax_h3_video_vae_fp16.safetensors` | `ComfyUI/models/vae/` |
 | `minimax_h3_audio_vae_fp32.safetensors` | `ComfyUI/models/vae/` |
 
-- **Apple Silicon注意（このMacはM4 Max / 64GB）**: 公式チュートリアル既定のテキストエンコーダ`qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors`（NVFP4 AWQ）はNVIDIA向け量子化。**MacではINT8版**（`Comfy-Org/MiniMax-H3`の`text_encoders/`にあるINT8/bf16バリアント）を選ぶ。Sage Attention高速化もNVIDIA向けなので導入しない。
-- H3のApple Silicon（MPS）対応は公式に未検証。**セットアップ時に必ず公式ドキュメント（上記URL）を開いて最新の対応状況・推奨構成を確認する**。pruned INT8構成（拡散モデル約19.5GB＋エンコーダ約25GB＋VAE約5.5GB）は64GB統合メモリでは限界に近い。メモリ不足で落ちる場合は`--lowvram`等の起動オプションを試し、それでも動かない場合は勝手に別モデルへ代替せず**ユーザーへ状況を報告して指示を仰ぐ**。
 - ライセンスはMiniMax H3 Community License。商用利用条件はライセンス本文を確認する。
 
-### APIワークフローJSONの準備（初回のみ）
+### GPUごとの重み選択（CUDA）
 
-チャプター生成はComfyUIのAPI（`h3_run.py`）で回す。初回セットアップ時に:
+`Comfy-Org/MiniMax-H3`には同じモデルの量子化バリアントが複数ある。**GPUの世代に合うものを選ぶ**（合わないものを選ぶと起動すらしない）:
 
-1. ComfyUIを起動し、テンプレートブラウザから公式テンプレート **MiniMax H3 I2V** と **MiniMax H3 R2V** を開く。
-2. それぞれをそのまま（プレースホルダ入力のまま）**Export (API)** し、`.claude/skills/local-video/workflows/h3_i2v_api.json` / `h3_r2v_api.json` として保存する。
-3. 以後のランでは、このJSONをラン専用ディレクトリへコピーして入力（画像/音声ファイル名・プロンプト・尺・解像度）を書き換え、`h3_run.py`に渡す。
+| GPU | 拡散モデル | テキストエンコーダ | 備考 |
+|---|---|---|---|
+| Blackwell（RTX 50xx / B200） | `*_pruned_fp8_scaled`（各21GB） | `qwen3vl_32b_minimax_h3_nvfp4_awq`（16GB） | 最速・最小。NVFP4のネイティブ対応があるのはこの世代 |
+| Ada / Hopper（RTX 40xx / L40S / H100） | `*_pruned_fp8_scaled`（各21GB） | `qwen3vl_32b_minimax_h3_int8_convrot`（27GB） | fp8がネイティブ |
+| Ampere（RTX 30xx / A100） | `*_pruned_int8_convrot`（各21GB） | `qwen3vl_32b_minimax_h3_int8_convrot`（27GB） | INT8 Tensor Coreを使う |
+| VRAM 80GB以上 | `*_pruned_bf16`（各40GB） | `qwen3vl_32b_minimax_h3_bf16`（51.5GB） | 量子化なし＝最高画質 |
+
+- **VRAMの目安**: エンコーダとDiTはComfyUIが順次ロード・オフロードするので同時常駐はしない。24GBカードでもシステムRAMが十分あれば動くが、スワップが出る。48GB以上が快適。
+- **`--disable-smart-memory`はテキストエンコーダの退避には効かない**（エンコーダはCPU側に載るため、ComfyUIが「計算デバイスから退避すべき対象」と見なさない）。メモリ圧の解決策として当て込まないこと。
+- I2Vチャプターは`fl2va`、R2Vチャプターは`ref2va`を使う。**両方必要**。
+
+### APIワークフローJSONの準備
+
+チャプター生成はComfyUIのAPI（`h3_run.py`）で回す。JSONの用意には2つの方法があり、**通常は方法Aを使う**。
+
+#### 方法A（推奨・ブラウザ不要）: `build_h3_workflow.py`でチャプター毎に生成する
+
+同梱の`build_h3_workflow.py`が、公式テンプレートと同じ結線のAPI形式JSONを直接組み立てる。ヘッドレス環境でも動き、H3の入力上限とフレームグリッドをスクリプト側で強制するので取り違えが起きない。
+
+```
+# セリフなしチャプター（I2V・開始/終了フレームを厳密固定）
+python3 .claude/skills/local-video/build_h3_workflow.py --mode i2v \
+  --out 03_SCRIPTS/<NN>_<slug>/ch1_workflow.json \
+  --prompt-file 03_SCRIPTS/<NN>_<slug>/ch1_prompt.txt \
+  --frames 294 --first ch1_start.png --last ch1_end.png
+
+# セリフありチャプター（R2V・参照画像＋音声）。--imageの順序が<Picture N>タグの順序になる
+python3 .claude/skills/local-video/build_h3_workflow.py --mode r2v \
+  --out 03_SCRIPTS/<NN>_<slug>/ch8_workflow.json \
+  --prompt-file 03_SCRIPTS/<NN>_<slug>/ch8_prompt.txt --frames 124 \
+  --image ch8_start.png --image ch8_end.png --image Fukuchan_sheet.png \
+  --image Yametaro_sheet.png --image height_lineup.png \
+  --audio ch8_line1_fukuchan.wav
+```
+
+- 重みはGPUに合わせて`--encoder` / `--unet-i2v` / `--unet-r2v`で差し替える（既定はINT8ペア＝Ampere向け）。
+- Motion promptは`extract_prompts.py`で`script.md`から**逐語抽出**して渡す（要約禁止のルールを機械的に守るため。プロンプトを別ファイルに手で書き写さない）:
+  ```
+  python3 .claude/skills/local-video/extract_prompts.py 03_SCRIPTS/<NN>_<slug>
+  ```
+- `--frames`は17k+5グリッド（24fps）以外を渡すとエラーになる。R2Vで画像9枚・音声3本・合計12を超えてもエラーになる。
+
+#### 方法B（フォールバック）: ComfyUIのUIから`Export (API)`
+
+1. ComfyUIを起動し、テンプレートブラウザから公式テンプレート **MiniMax H3 I2V** / **MiniMax H3 R2V** を開く。
+2. **Export (API)** して`workflows/h3_i2v_api.json` / `h3_r2v_api.json`として保存する。
+3. ラン専用ディレクトリへコピーし、入力を書き換えて`h3_run.py`に渡す。
+
+**方法Bの注意（実測）**:
+
+- **ブラウザセッションが必要**なので、ヘッドレス/CLIのみの環境では使えない。その場合は方法A、または同梱の`ui2api.py`で公式テンプレート（UI形式JSON）を実行中のComfyUIの`/object_info`を使ってAPI形式へ変換する。テンプレート本体は`ComfyUI/venv/lib/python*/site-packages/comfyui_workflow_templates_json/templates/video_minimax_h3_{i2v,r2v}.json`にある（`api_`で始まる方はクラウドAPIノード版なので**使わない**）。
+- **I2Vテンプレートはサブグラフ（UUID型ノード）で包まれている**ため単純な変換では展開できない。R2Vテンプレートはフラットなので変換しやすい。方法Aはこの問題を回避する。
+- **公式テンプレートはテキストエンコーダに`qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors`（NVIDIA専用）をハードコードしている。** そのまま使うとBlackwell以外では動かない。GPUに合うものへ必ず差し替える。
+- テンプレートは解像度を`ResolutionSelector`（既定0.4MP）から取るため、`script.md`のフレーム数・解像度と食い違う。方法Aは`width`/`height`/`length`を直値で入れるので`script.md`と一致する。
 
 ### 画像検証用VLM（Ollama + Qwen3-VL）
 
-- 導入: `brew install ollama`（または https://ollama.com/download ）→ `ollama pull qwen3-vl:32b`
-- このMac（64GB）の既定は**Qwen3-VL 32B**（検証精度優先）。メモリの少ないマシンでは`qwen3-vl:8b`に落とす（`OLLAMA_VLM`環境変数で`verify_frame.py`のモデルを差し替え可能）。
+- 導入: `brew install ollama`（または https://ollama.com/download ）→ `ollama pull qwen3-vl:8b`（または`:32b`）
+- **32Bは64GB以上のマシン向け**（検証精度優先）。32GB機では`qwen3-vl:8b`を使う（`OLLAMA_VLM`環境変数で`verify_frame.py`のモデルを差し替え可能）。
 - モデルタグが取得できない場合はOllamaのライブラリページ（上記URL）で最新のタグ名を確認する。
 
 ## 2. 出力ディレクトリと参照同梱
@@ -167,6 +281,11 @@ ffmpeg -y -i ch3_line1_fukuchan.wav -af "apad=whole_dur=2.0" ch3_line1_fukuchan_
 - キーフレーム枚数の下限は「チャプター数＋1」（つなぎ目共有のため）。作業前に総時間を見積もる。
 - チェーン生成なので並列化不可。フォアグラウンドで1枚を待つとツールタイムアウト（10分）に掛かるため、**全フレームを1本のシェルスクリプトにまとめて必ずバックグラウンドで実行**する。スクリプトには「出力が既にあればスキップ」を入れる（中断・再開とステップ6の部分再生成で同じスクリプトを再利用するため）。
 - 使用シードは`script.md`に記録する（部分再生成の再現性のため）。
+- **ノートPCでは`caffeinate`で必ずスリープを禁止する（実測で必要）。** 長時間チェーンを放置するとmacOSがidle sleepに入り、生成が止まる。実例: 1枚16分のフレームが夜間放置で**壁時計9時間24分**かかった（`pmset -g log`に"Wake from Deep Idle"が並ぶ）。生成が異常に遅いときは性能劣化を疑う前に`pmset -g log | grep -E "Sleep|Wake"`でスリープ履歴を見る。
+  ```
+  nohup caffeinate -dimsu > /dev/null 2>&1 &   # 実行中のプロセスを止めずに後から掛けてもよい
+  ```
+  作業が終わったら忘れずに停止する（`pkill caffeinate`）。
 
 ### 一括生成→一括検証（本スキルの要）
 
@@ -202,8 +321,13 @@ EOF
 - NG要素が崩れたフレームは**前フレーム＋キャラクターシートの連結キャンバス**を種に作り直す（前フレーム単体で作り直しても同じ崩れ方をする）。
 - 同一キャラが5枚以上続くチェーンでは、崩れる前でも数フレームおきにシートを再投入する。
 - **NG要素は毎フレーム明文で固定する**（正しい形＋否定形のセット。例: "he keeps SMALL ROUND white-rimmed glasses — NOT rectangular, NOT thick dark-rimmed"）。「形が変わる」だけでなく「丸ごと消える」ドリフトも起きるため、存在自体も守る（"he is ALWAYS WEARING his round glasses ... the glasses do NOT disappear"）。
-- ラン途中の新キャラ登場は、シート連結より**文章指定**のほうが画風混在（その新キャラだけ写実顔になる等）を起こしにくい。前フレーム単体を種に、各キャラ設定mdの「プロンプト用同定句（英語）」＋"Draw <name> in EXACTLY the same rendering style as the rest of the input image"で指定する。キーフレーム上の似姿は多少甘くてよい（動画側の同一性はH3へ渡すシートで担保する。優先すべきは画風の統一と構図）。
+- **ラン途中の新キャラ登場は、シートを連結せず必ず「文章指定」にする（実測で失敗済み・違反禁止）。** 前フレーム単体を種に、各キャラ設定mdの「プロンプト用同定句（英語）」＋"Draw <name> in EXACTLY the same rendering style as the rest of the input image"で指定する。キーフレーム上の似姿は多少甘くてよい（動画側の同一性はH3へ渡すシートで担保する。優先すべきは画風の統一と構図）。
+  - **実際の失敗例（2026-08）**: 実写写真シートの福ちゃんをチビ絵チェーンの`ch5_end`でシート連結して登場させたところ、モデルが矛盾を「福ちゃんもチビにする」ことで解消し、**やめ太郎と同じ頭身・同じ丸メガネ・同じ頬紅のチビ人形**になった上、身長差も消えて（本来はやめ太郎の全身が腰まで）、やめ太郎側に福ちゃんのネームストラップまで移った。下流9枚を作り直すことになった。
+  - 人間キャラを文章指定するときは**頭身とスケールを毎フレーム明文で固定する**: "an ADULT MAN WITH NORMAL HUMAN PROPORTIONS, normal-sized head (~1/7 of his height), NOT a chibi character, NOT a toy figure" ＋ "MUCH TALLER than <chibi char>: the whole of <chibi char> only reaches his hip"。
+  - **キャラ間の衣装汚染も否定形で止める**: "<chibi char> wears NO lanyard, NO name tag and NO jacket — only his <canonical outfit>"。
 - セリフのあるチャプターのキーフレームは**話者の口を開け、非話者の口を閉じて**描く（リップシンク取り違え防止の最強シグナル）。
+- **飲み物の器は「フレーム内に何個あるか」まで指定する（実測で失敗済み）。** 「空のジョッキ」とだけ書くと、モデルが**台帳に無い2つ目の器**（液体入りのタンブラー等）を勝手に足し、以降のチェーンで「空」の指示が別の器に当たって元のジョッキが満杯に戻る/消える、という状態崩壊が起きた。個数まで固定する: "There is exactly ONE drinking vessel in the entire frame: a single EMPTY clear glass mug … There is NO second glass, NO tumbler, NO cup and NO bottle anywhere, and NO liquid of any kind is visible anywhere in the frame"。
+- **数え物は「達成できる configuration」で書く。** 「潰れた缶3本」と書いても実際には「潰れ2本＋直立1本」で安定した。台帳とプロンプトを実際に安定して出る配置へ合わせるほうが、毎フレーム再生成するより良い（チェックリストも同じ表現に合わせる。でないと欠陥でないものがFAILし続ける）。
 
 ## 6. 画像検証（Qwen3-VL一括検証→修正リスト確定→部分再生成）
 
@@ -252,9 +376,12 @@ EOF
 
 ## 7. H3動画生成（チャプター毎・ComfyUI）
 
+**このステップだけはNVIDIA CUDA GPUが必要**（ステップ1「動作環境の前提」参照）。Apple Siliconで作業している場合は、ここまでの成果物をポータブルバンドルにしてCUDA機へ渡す。
+
 ### 実行方法
 
 1. ComfyUIをバックグラウンドで起動する（起動済みならそのまま使う）: `cd ~/ComfyUI && python3 main.py --listen 127.0.0.1 --port 8188`（環境により`--lowvram`等を付与）。
+   - **プロセスを止めるときは`pkill -f "main.py --listen"`でマッチさせる。** `pkill -f "venv/bin/python main.py"`は`ps`がvenvのshimをフレームワークPythonの実体パスに解決するため**何にもマッチせず黙って失敗する**（実測: 停止したつもりで旧インスタンスが動き続け、新インスタンスがポート衝突で即死した）。停止後は必ず`pgrep -f "main.py --listen" | wc -l`で0を確認する。
 2. チャプターの入力ファイル（キーフレームPNG・シートPNG・wav）を`ComfyUI/input/`へコピーする。
 3. セットアップ時に保存したAPIワークフローJSON（`h3_i2v_api.json`/`h3_r2v_api.json`）をラン専用ディレクトリへ`chN_workflow.json`としてコピーし、そのチャプターのH3 inputs表どおりに書き換える（画像/音声ファイル名、Motion prompt原文、尺、解像度、モードに応じたチェックポイント）。
 4. 同梱の`h3_run.py`で投入し、完了を待って出力を回収する:
