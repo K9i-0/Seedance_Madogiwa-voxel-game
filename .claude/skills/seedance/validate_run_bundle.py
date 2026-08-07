@@ -89,11 +89,18 @@ def main() -> None:
                 errors.append(f"Clip {clip}: Motion prompt does not redeclare '@Image{slot} = {filename}'")
 
         for label in ("Start frame (Frame A)", "End frame (Frame B)", "Audio"):
-            declaration = re.search(rf"^- {re.escape(label)}:\s*`([^`\n]+)`", input_table, re.MULTILINE)
+            declaration = re.search(rf"^- {re.escape(label)}:\s*(?:`([^`\n]+)`|([^\n]+))", input_table, re.MULTILINE)
             if declaration is None:
                 errors.append(f"Clip {clip}: missing {label} file declaration")
                 continue
-            filename = declaration.group(1)
+            filename = (declaration.group(1) or declaration.group(2)).strip()
+            if label == "Audio":
+                normalized_audio = filename.lower().rstrip(".")
+                if normalized_audio in {
+                    "seedance-generated voice (no local audio file; generated inside seedance)",
+                    "seedance-generated ambience only; no local audio file, no voice, narration, or caption readout",
+                }:
+                    continue
             if Path(filename).name != filename:
                 errors.append(f"Clip {clip}: {label} must use a bundled basename, not path: {filename}")
             elif not (run_dir / filename).is_file():
