@@ -134,7 +134,7 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 Seedance 2.0は**複数人が映るクリップでのリップシンクの話者割り当てが弱い**（公式にも未解決の課題とされ、実際に「福ちゃんの音声でやめ太郎の口が動く」取り違えが起きた）。これを防ぐため:
 
 - **1クリップにつき話者は1人を原則とする。** 会話の掛け合いは、話者が交代するタイミングでクリップを分割する（分割はつなぎ目共有フレームで滑らかに繋がるので尺・演出上の不利益はない）。
-- 掛け合いのテンポ上どうしても1クリップに複数話者を入れる場合は、(1) 音声ファイルを発話順に分けて添付し、(2) Motion promptに話者の順番・誰がどの音声かを@メンションと見た目で明示し、(3) "the two lines do NOT overlap" を入れる。それでも取り違えが出たら迷わずクリップを割る。
+- 掛け合いのテンポ上どうしても1クリップに複数話者を入れる場合は、(1) 音声ファイルを発話順に分けて添付し、(2) Motion promptに話者の順番・誰がどの音声かを@メンションと見た目で明示し、(3) "the two lines do NOT overlap" を入れ、(4) **発話順に安定した話者ID（`(S1)`/`(S2)`）を各話者に振り、Motion prompt内でその話者に言及するたびに同じIDを添える**（公式H3ガイドの話者ID記法。@メンション＋同定句への追加の保険。クリップ内でIDを振り直さない。例: "Fukuchan (@Image3, the slim stylish black-haired man) (S1) speaks first; Yametaro (@Image4, the chibi man with round glasses) (S2) replies"）。それでも取り違えが出たら迷わずクリップを割る。
 - 台本上は、各セリフに**話者のキャラ名＋見た目の同定句**を添える（後述「話者バインディング」参照）。
 
 ### リップシンク精度ルール（クリップ尺≒発話長・重要）
@@ -165,6 +165,15 @@ Seedanceはプロンプト内の日本語セリフ引用や添付音声につら
 - **全クリップのMotion promptに、次の否定指示を必ず入れる**: "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters; the video must contain no text at all"。画面内文字を台本が指定するクリップだけ、その文字を唯一の例外として明記する（例: "the ONLY text allowed on screen is 43℃ on the thermometer — render no other text, no subtitles, no captions"）。
 - キーフレーム生成プロンプトの "no text overlay"（ステップ3）と、参照シートの文字ラベルを漏らさない指示（ステップ4）もこの方針の一部であり省略しない。
 - 字幕・クレジットなど意図的なテキストが必要な場合はSeedanceに描かせず、**CapCutのテキスト機能で後載せする**（VOICEVOXクレジットと同じ扱い）。
+
+### 音響設計ルール（環境音と劇伴の分離・重要）
+
+音の指定がないと、生成モデルが環境音・BGMを勝手に選ぶ（場違いな音楽、不自然な無音、セリフに被る劇伴等）。公式MiniMax H3プロンプトガイド（h3-prompt-writing）の「音を2系統に分けて書く」形式を採用し、**全クリップのMotion promptの末尾に次の2つを必ず入れる**:
+
+- **`Soundscape:`（画面内の音）**: 環境音・動作音を1〜2文の英語で具体的に書く（例: "Soundscape: quiet office room tone, distant keyboard clatter, the soft clink of the glass mug being set down"）。セリフはここに再掲しない（セリフは本文の話者バインディングで指定済み）。
+- **`Music:`（劇伴＝画面外の音楽）**: 有無を必ず明示する。BGMは原則Seedanceに生成させず、必要ならCapCutで後載せするため、**既定は "Music: no background music"**。生成音に劇伴を含めたいクリップだけ、**楽器・テンポ・リズム・強弱で具体的に**書く（例: "Music: light ukulele and acoustic guitar, medium tempo, playful staccato rhythm, quiet under the dialogue"）。"happy vibes"のような抽象的なムード語だけの指定は禁止。
+
+`validate_run_bundle.py`が各Motion prompt内の`Soundscape:`と`Music:`の記載を機械検証する。
 
 ### セリフ音声の扱い（ローカル音声はボイスサンプル・実音声はSeedanceが生成・重要）
 
@@ -331,7 +340,7 @@ codex exec -s workspace-write --enable image_generation \
   - @Image3 = Yotan_sheet.png → Yotan (the slim 170cm blond rocker)
   - @Image4 = Fukuchan_sheet.png → Fukuchan (the slim stylish 170cm man in a black long coat)
   - @Image5 = Yametaro_sheet.png → Yametaro (the chibi cartoon man with round glasses)
-- Motion prompt: <the clip's Seedance prompt — describe the motion BETWEEN the two frames as explicit state transitions (e.g. "pours beer into the EMPTY glass until it is full; no one drinks from the bottle"); dialogue kept in original language>
+- Motion prompt: <the clip's Seedance prompt — describe the motion BETWEEN the two frames as explicit state transitions (e.g. "pours beer into the EMPTY glass until it is full; no one drinks from the bottle"); camera written as type + amplitude + speed (or "locked-off static camera"); dialogue kept in original language; end with the sound design lines "Soundscape: <ambient/action sounds>" and "Music: no background music">
 - Duration: 5s / Aspect: 16:9
 ```
 
@@ -339,10 +348,13 @@ codex exec -s workspace-write --enable image_generation \
 - **Motion promptは「そのまま貼れる完成形」で書き、実行時の要約・短縮を禁止する。** `script.md`のMotion promptがCapCutに入力される最終文字列そのものであり、生成実行者（人間・エージェント問わず）が独自に圧縮・言い換えしてはならない（過去に要約で開始/終了状態・プロップ・NG変更の制約が欠落し、整合性が崩れた）。プロンプトが長すぎて入らない・守られない場合は、要約するのではなく**台本に戻ってクリップを分割**し、1本あたりの情報量を減らす。
 - **全クリップのMotion promptに画面内テキスト禁止の否定指示を必ず入れる**（ステップ1「画面内テキスト禁止ルール」参照）: "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters; the video must contain no text at all"。台本が画面内文字を指定するクリップは、その文字だけを唯一の例外として明記する。`validate_run_bundle.py`がこの記載（"on-screen text"への言及）を機械検証する。
 - **全クリップのMotion promptに、Scene ledgerの時間帯・光の句を必ず入れる**（ステップ1「Scene ledger」参照）: 例 "bright midday daylight"。場所転換のあるクリップは転換先の時間帯まで明示し、典型絵が別の時間帯の場所には否定形を添える（"it is DAYTIME, NOT night"）。`validate_run_bundle.py`が`## Scene ledger`セクションの存在と、各Motion prompt内の時間帯語（daylight/daytime/midday/night等）を機械検証する。
+- **全クリップのMotion promptに、音響指定（`Soundscape:`と`Music:`）を必ず入れる**（ステップ1「音響設計ルール」参照）。既定は "Music: no background music"。`validate_run_bundle.py`が両方の記載を機械検証する。
+- **カメラワークは「種類＋振幅＋速度」の標準記法で書く**（公式H3プロンプトガイド由来）: 例 "the camera pushes in with small amplitude at slow speed"、"slow lateral tracking shot, small amplitude"。"dynamic camera"のような曖昧語だけの指定はしない。カメラを動かさないクリップは "locked-off static camera" と明示する（無指定だとモデルが勝手にカメラを動かす）。
 - **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。セリフのあるクリップのDurationは**「サンプル音声の合計長＋約1秒」**を目安にする（ステップ1「リップシンク精度ルール」参照。Seedanceが生成した実発話がこの目安とずれても動画を正とする）。
 - 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
 - **Reference images表に書いた全ファイルはラン専用ディレクトリ直下に実在しなければならない。** 表だけ書いて実ファイルを同梱しない状態は禁止する。
 - **キャラの参照はキャラクターシート`02_CHARACTERS/<キャラ名>_sheet.png`を第一に使う**（多面図モデルシート。複数アングル＋NG要素クローズアップ＋表情差分を1枚で渡せるため、横顔・後ろ姿・演技でのidentity driftに強い）。プロンプトには "Image N: <name>'s character model sheet — turnaround, detail close-ups and expressions of the SAME character, identity/design reference only, NOT a composition reference" のように役割を明記する。参照は画風の揃ったものだけを混ぜる（実写写真とアニメ調シートを同時に渡すと折衷して顔が変わるため、原則シート側に統一する）。
+- **参照ごとに「保持する属性 / 引き継がない属性」を列挙する**（公式Ref2VAガイドのretention分析由来）: 役割宣言（identity/design reference only）に加えて、何を維持し何を持ち込まないかを明示すると、シートのポーズ・背景・パネルレイアウトが動画に漏れるのを防げる。例: "@Image1 = Sobaya_sheet.png — PRESERVE: face, mask, body build, outfit and its colors (all NG-change elements); do NOT carry over: pose, camera angle, sheet background or panel layout"。**PRESERVE側にはそのキャラのNG変更要素を必ず含める。**
 - **シート上の文字ラベルの扱い**: シートには「SOBAYA」「MASK」等の短い英語ラベルが入っており、これは部位とキャラ名の紐付けを強めるため意図的なもの（実運用で精度向上が確認されている）。ただし**補間対象になるキーフレーム（clipN_start/end.png）には文字を入れない**方針は変わらない。Motion promptに "the reference sheets' text labels must NOT appear in the video" を入れておくと安全。
 - **シートとキャラの紐付けを対応表とプロンプトの両方で明示する**: 対応表のReference imagesは「@ImageN = ファイル名 → キャラ名（短い同定句）」の形で1行ずつ書く。Motion prompt内でキャラに言及するときは、毎回「キャラ名＋同定句＋@ImageN」で書く（例: "Sobaya (@Image1, the hulking masked man) lifts the mug"）。同定句は各キャラ設定md（`02_CHARACTERS/0N_*.md`）の「プロンプト用同定句（英語）：」が正典。年齢・身長・体格などの設定はシート画像に文字で書き込まず、この同定句としてプロンプト側で渡す（画像内の文字は動画に漏れて崩れるリスクがあり、モデルも文章仕様を確実には読まないため）。
 - **各Motion promptの冒頭に、添付必須ファイルをファイル名付きで再宣言する。** 対応表の外に書いただけでは不十分。次の形式で、該当クリップの全`@ImageN`を列挙する:
@@ -387,6 +399,7 @@ Generate ONLY Clip 1, then verify ALL of the following before touching any other
 - [ ] Motion, poses and prop states match the Motion prompt and the Prop state ledger
 - [ ] Location, time of day and lighting match the Scene ledger in EVERY frame — no unexplained day-to-night (or night-to-day) jump anywhere in the clip, including during location transitions
 - [ ] NO on-screen text appears that the script did not explicitly call for — no spontaneous subtitles, captions, or Japanese lettering anywhere in the clip
+- [ ] Ambient sound and music match the prompt's Soundscape/Music lines — no unrequested background music, no out-of-place ambience
 - [ ] Hinges, handles and other fixture hardware stay on the edges given in the Fixture layout table in EVERY frame (handles never disappear, jump to the hinge side, or duplicate — especially when a door finishes closing)
 - [ ] The clip duration equals the Duration specified in the CapCut inputs table (NOT the ~8s default). The generated speech may run shorter or longer than the sample wav's duration — that is acceptable; the VIDEO is the source of truth for audio timing.
 If any check fails, fix the inputs/prompt and regenerate Clip 1 until all pass.
@@ -431,5 +444,6 @@ python3 .claude/skills/seedance/validate_run_bundle.py 03_SCRIPTS/<NN>_<slug>
 - 各Motion promptに`Required attached reference files:`があり、対応表の全`@ImageN = filename`がファイル名ごと再宣言されている
 - 各クリップのFrame A、Frame B、Audioが存在する
 - `## Scene ledger`セクションが存在し、各Motion promptに時間帯・光の語（daylight/daytime/midday/evening/night等）が含まれている
+- 各Motion promptに音響指定（`Soundscape:`と`Music:`）が含まれている
 
 検証失敗時は不足ファイルをコピーするかプロンプトを修正し、再実行する。**失敗したままユーザーへ完了報告してはいけない。**

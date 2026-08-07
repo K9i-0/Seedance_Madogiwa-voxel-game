@@ -5,6 +5,7 @@ Checks every '### H3 inputs (Chapter N)' section in script.md:
 - all declared PNG/WAV files exist in the run directory as physical files (basenames only)
 - R2V chapters stay within H3's input limits (<=9 pictures, <=3 audio, <=12 files total)
 - every Motion prompt redeclares its attachments via 'Required attached input files:'
+- every Motion prompt ends with sound-design lines ('Soundscape:' and 'Music:')
 - I2V chapters declare First/Last frame files
 - script.md does not reference paths outside the run directory
 """
@@ -76,6 +77,14 @@ def main() -> None:
 
         if re.search(r"^- Duration:", section, re.MULTILINE) is None:
             errors.append(f"Chapter {chapter}: missing Duration line")
+
+        for field in ("Soundscape:", "Music:"):
+            if prompt and field not in prompt:
+                errors.append(
+                    f"Chapter {chapter}: Motion prompt lacks '{field}' "
+                    "(sound design rule: end every Motion prompt with a Soundscape line for ambient/action "
+                    'sounds and a Music line — default "Music: no background music")'
+                )
 
         if mode == "I2V":
             for label in ("First frame", "Last frame"):
