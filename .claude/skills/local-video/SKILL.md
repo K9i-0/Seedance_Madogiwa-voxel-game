@@ -225,6 +225,19 @@ H3には2つのチェックポイントがあり、チャプターごとにど�
 - **R2V（Ref2VA）— セリフのあるチャプター**: 参照画像（最大9）＋音声（最大3）を渡せる唯一のモード。**開始・終了キーフレームは<Picture 1>/<Picture 2>として渡し、プロンプトで「動画はこの絵で始まりこの絵で終わる」と明示的に拘束する**（I2Vほど厳密なアンカーではないため、パイロット検証で乖離を確認する）。残りの画像スロットにキャラクターシートを入れて同一性を固定する。
 - 添付ファイルはプロンプト内で**接続順のタグ**で参照する: `<Picture 1>`, `<Audio 1>`（seedanceの`@Image1`/`@Audio1`に相当。話者バインディングもこのタグで行う）。
 
+### Motion promptの内部構造（公式h3-prompt-writing準拠）
+
+H3はモデル提供元の公式プロンプトガイド（ https://github.com/MiniMax-AI/MiniMax-H3/tree/main/skills/h3-prompt-writing ）の記法で学習されているため、Motion prompt本文はその構造に合わせる。冒頭の`Required attached input files:`（機械検証対象）は従来どおり必須で、その後の本文を次の順・記法で書く:
+
+1. **本文（統合記述）**: 構図→被写体→環境→動作→カメラ→画面内の音の順で、**見える・聞こえるものを具体的に**書く（あらすじ要約にしない）。seedance由来のルール（状態遷移記法・時間帯の句・NG要素・画面内テキスト禁止）はこの本文に入れる。
+2. **カメラは「種類＋振幅＋速度」の標準記法で書く**: 例 "the camera pushes in with small amplitude at slow speed"。動かさないなら "locked-off static camera" と明示する。
+3. **セリフの記法（R2Vのみ）**: 話者に発話順で安定ID `(S1)`/`(S2)` を振り、セリフ本文を `<d>[Japanese] セリフ原文</d>` タグで逐語埋め込みする（翻訳・言い換え禁止。添付wavを使う場合もセリフ本文を`<d>`タグで書く）。例: "ONLY Fukuchan (<Picture 3>, the slim stylish black-haired man) (S1) speaks — he says <d>[Japanese] 快適です！</d>, lip-syncing to <Audio 1>"。画面外ナレーションは "says in an off-screen voiceover" と書き、映っているキャラ全員に "lips remain completely closed" を添える。
+4. **`Soundscape:`（末尾に必須）**: 環境音・動作音を1〜4文の英語で書く。セリフはここに再掲しない。
+5. **`Music:`（末尾に必須）**: 劇伴の有無を必ず明示する。既定は "Music: no background music"（BGMはffmpeg結合時に後載せできる）。生成させる場合は**楽器・テンポ・リズム・強弱で具体的に**書き、抽象的なムード語だけで書かない。
+6. **分量**: 本文全体で**350〜500語**を目安にする（公式ガイドの推奨値）。セリフの多いチャプターは語数より発話タイムラインの完全性を優先する。長すぎるなら要約せずチャプターを割る。
+
+`validate_local_run_bundle.py`が各Motion prompt内の`Soundscape:`と`Music:`の記載を機械検証する。
+
 ### H3 inputs表（`script.md`の各チャプターに必須）
 
 seedanceの「CapCut inputs」に代わり、各チャプターに以下を書く（英語）:
@@ -239,7 +252,7 @@ seedanceの「CapCut inputs」に代わり、各チャプターに以下を書�
 - Audio (max 3 files, each 2-15s, 15s total; attach in speaking order):
   - <Audio 1> = `ch3_line1_fukuchan.wav` (2.0s; padded from 1.6s) — spoken by Fukuchan, use AS-IS as the dialogue audio
 - Total input files: 4 / 12
-- Motion prompt: Required attached input files: <Picture 1> = ch3_start.png — start keyframe; <Picture 2> = ch3_end.png — end keyframe; <Picture 3> = Fukuchan_sheet.png — identity reference; <Audio 1> = ch3_line1_fukuchan.wav — Fukuchan's line. These attachments are REQUIRED inputs. The video starts EXACTLY on <Picture 1> and ends EXACTLY on <Picture 2>. <motion described as explicit state transitions, same rules as seedance>. ONLY Fukuchan (<Picture 3>, the slim stylish black-haired man) speaks, lip-syncing to <Audio 1> — he begins the line almost immediately and his mouth moves ONLY while <Audio 1> is playing; once the line ends his mouth stays CLOSED. Use <Audio 1> AS-IS as the dialogue audio and do NOT generate any voice. The reference sheets' text labels must NOT appear in the video.
+- Motion prompt: Required attached input files: <Picture 1> = ch3_start.png — start keyframe; <Picture 2> = ch3_end.png — end keyframe; <Picture 3> = Fukuchan_sheet.png — identity reference (PRESERVE: face, hairstyle, outfit and all NG-change elements; do NOT carry over: pose, camera angle, sheet background or panel layout); <Audio 1> = ch3_line1_fukuchan.wav — Fukuchan's line. These attachments are REQUIRED inputs. The video starts EXACTLY on <Picture 1> and ends EXACTLY on <Picture 2>. <motion described as explicit state transitions, same rules as seedance; camera as type + amplitude + speed, e.g. "locked-off static camera">. ONLY Fukuchan (<Picture 3>, the slim stylish black-haired man) (S1) speaks — he says <d>[Japanese] セリフ原文</d>, lip-syncing to <Audio 1>; he begins the line almost immediately and his mouth moves ONLY while <Audio 1> is playing; once the line ends his mouth stays CLOSED. Use <Audio 1> AS-IS as the dialogue audio and do NOT generate any voice. The reference sheets' text labels must NOT appear in the video. Soundscape: <ambient and action sounds in 1-4 sentences, dialogue not repeated>. Music: no background music.
 - Duration: 5s / Aspect: 16:9 (native 768p — output rounds to 1344x768)
 ```
 
@@ -250,7 +263,7 @@ seedanceの「CapCut inputs」に代わり、各チャプターに以下を書�
 - Mode: I2V
 - First frame: `ch2_start.png`
 - Last frame: `ch2_end.png`
-- Motion prompt: <explicit state transitions; no dialogue; "no speech, no narration — ambient sound only">
+- Motion prompt: <explicit state transitions; camera as type + amplitude + speed; no dialogue; "no speech, no narration"> Soundscape: <ambient and action sounds in 1-4 sentences>. Music: no background music.
 - Duration: 4s / Aspect: 16:9 (native 768p)
 ```
 
@@ -411,6 +424,7 @@ Generate ONLY the first dialogue chapter, then verify ALL of the following:
 - [ ] The video starts/ends on (or acceptably close to) the start/end keyframes — check R2V frame anchoring
 - [ ] Motion, poses, prop states and fixture hardware match the Motion prompt / ledgers
 - [ ] Character identity and NG-change elements survive H3 generation (compare against the sheets)
+- [ ] Ambient sound and music match the prompt's Soundscape/Music lines (no unrequested background music)
 - [ ] Duration matches the H3 inputs table (remember the 17k+5-frame grid rounding)
 If any check fails, fix the workflow inputs/prompt and regenerate the pilot until all pass.
 Only then generate the remaining chapters, and re-run at least the audio + duration checks on each.
@@ -462,6 +476,6 @@ ffmpeg -y -i final_draft.mp4 -vf "drawtext=fontfile='/System/Library/Fonts/ヒ�
 python3 .claude/skills/local-video/validate_local_run_bundle.py 03_SCRIPTS/<NN>_<slug>
 ```
 
-検証内容: H3 inputs表の全ファイルがラン直下に物理ファイルとして存在する / R2Vチャプターの入力が「画像9・音声3・合計12」以内 / 各Motion promptが`Required attached input files:`で全`<Picture N>`/`<Audio N>`をファイル名ごと再宣言している / I2VチャプターにFirst/Last frameがある / `script.md`がラン外パスを参照していない。
+検証内容: H3 inputs表の全ファイルがラン直下に物理ファイルとして存在する / R2Vチャプターの入力が「画像9・音声3・合計12」以内 / 各Motion promptが`Required attached input files:`で全`<Picture N>`/`<Audio N>`をファイル名ごと再宣言している / 各Motion promptに音響指定（`Soundscape:`と`Music:`）がある / I2VチャプターにFirst/Last frameがある / `script.md`がラン外パスを参照していない。
 
 **検証が失敗したままユーザーへ完了報告してはいけない。**

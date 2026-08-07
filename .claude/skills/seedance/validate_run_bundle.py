@@ -76,6 +76,14 @@ def main() -> None:
                 "time of day and the video can jump from day to night)"
             )
 
+        for field in ("Soundscape:", "Music:"):
+            if prompt and field not in prompt:
+                errors.append(
+                    f"Clip {clip}: Motion prompt lacks '{field}' "
+                    "(sound design rule: end every Motion prompt with a Soundscape line for ambient/action "
+                    'sounds and a Music line — default "Music: no background music")'
+                )
+
         for slot, filename in mappings:
             if Path(filename).name != filename:
                 errors.append(f"Clip {clip}: @Image{slot} must use a bundled basename, not path: {filename}")
