@@ -1,0 +1,18 @@
+model: qwen3-vl:8b
+image: 03_SCRIPTS/26_kansha_no_bug_ichimankai/ch3_end.png
+1. FAIL — Red can has visible readable text ("Coca-Cola" branding)
+2. PASS — Yametaro bowing head low over pressed palms, eyes squeezed shut, mouth closed
+3. PASS — Small round white-rimmed glasses on face (not rectangular/missing)
+4. PASS — No lanyard, name tag, or jacket visible
+5. PASS — Paper spec booklet is closed flat (single sheet with no pages visible)
+6. FAIL — Laptop screen shows red background with white line (not a solid red horizontal bar)
+7. PASS — Laptop lid open at ~100 degrees (hinge on rear edge)
+8. FAIL — Two drinking vessels present: empty glass mug and tumbler
+9. PASS — Three empty cans (two crushed, one upright)
+10. FAIL — Cardboard tray not present; stacked boxes are shipping containers, not a tray
+11. PASS — Warm golden afternoon daylight, daytime outside, black hair, purple shirt visible
+12. PASS — Window wall on right side with no handles/latches/hinges
+13. PASS — No other person in frame
+14. PASS — Photorealistic office interior with Yametaro as soft matte 3D chibi (not flat 2D anime)
+
+VERDICT: FAIL

@@ -1,0 +1,17 @@
+model: qwen3-vl:8b
+image: 03_SCRIPTS/26_kansha_no_bug_ichimankai/ch2_end.png
+1. FAIL — Visible "Coca-Cola" text on the can violates no readable text rule  
+2. PASS — Yametaro holds upright pose with closed eyes, smile, and pressed palms  
+3. PASS — Golden afternoon lighting with clear black hair and purple shirt  
+4. PASS — Small round white-rimmed glasses are present  
+5. PASS — No lanyard, name tag, or jacket on Yametaro  
+6. FAIL — Single sheet of paper (not a "spec booklet") is present  
+7. PASS — Laptop lid open with dark screen  
+8. FAIL — Beer mug contains liquid (not empty)  
+9. PASS — Three crushed/empty cans match count  
+10. FAIL — No cardboard tray exists in frame  
+11. PASS — Window on right, daytime outside  
+12. PASS — Only Yametaro present  
+13. PASS — Photorealistic 3D chibi style (not flat 2D)  
+
+VERDICT: FAIL

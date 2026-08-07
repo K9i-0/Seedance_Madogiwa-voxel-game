@@ -1,0 +1,14 @@
+This image should be the LAST frame of Chapter 1 (= FIRST frame of Chapter 2). Verify ALL of the following and answer PASS or FAIL per item:
+1. Exactly one coherent scene — no readable text, letters, labels or watermarks anywhere in frame.
+2. Yametaro — a tiny matte 3D chibi toy figure with an oversized head, black bowl-cut hair, pink blush cheeks and a purple shirt — sits BOLT UPRIGHT behind the cardboard desk with both palms pressed flat TOGETHER in front of his chest in a serene prayer, eyes CLOSED, a small calm smile, mouth CLOSED.
+3. Yametaro wears SMALL ROUND WHITE-RIMMED glasses — NOT rectangular, NOT thick dark-rimmed, NOT missing.
+4. Yametaro wears NO lanyard, NO name tag and NO jacket.
+5. The paper spec booklet on the desk is still OPEN and flat — NOT closed (unchanged from the first frame).
+6. The laptop lid is OPEN (~100 degrees, hinge on the rear edge) and its screen is still completely DARK — no red banner.
+7. Exactly ONE drinking vessel in the entire frame: a single EMPTY clear glass beer mug — no liquid visible, NO second glass, tumbler, cup or bottle anywhere.
+8. Exactly THREE empty cans on the desk (two crushed plus one upright).
+9. The cardboard tray is EMPTY.
+10. Window wall on frame RIGHT with Tokyo Tower outside; NO handle, latch or hinge on the window wall.
+11. Time of day: SOFT MORNING daylight, same as the chapter's first frame — bright daytime, NOT golden-hour orange, NOT dusk, NOT night.
+12. No other person in the frame.
+13. Style: photorealistic live-action-style office interior with Yametaro alone as a soft matte 3D chibi toy figure — NOT flat 2D anime.
