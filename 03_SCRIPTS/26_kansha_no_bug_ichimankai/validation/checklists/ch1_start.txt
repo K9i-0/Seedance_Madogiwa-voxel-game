@@ -1,0 +1,14 @@
+This image should be the FIRST frame of Chapter 1 of a video (a high-rise Tokyo office, Window-Side Tribe area). Verify ALL of the following and answer PASS or FAIL per item:
+1. Exactly one coherent scene — not a multi-panel sheet, no contact-sheet layout, and NO readable text, letters, labels or watermarks anywhere in frame.
+2. Yametaro — a tiny matte 3D chibi toy figure with an oversized head, black bowl-cut hair, pink blush cheeks and a purple shirt — sits behind a corrugated CARDBOARD desk, slumped forward and deflated, shoulders dropped, looking DOWN at an OPEN paper booklet lying flat on the desk. His mouth is CLOSED.
+3. Yametaro wears SMALL ROUND WHITE-RIMMED glasses — NOT rectangular, NOT thick dark-rimmed, and the glasses are NOT missing.
+4. Yametaro wears NO lanyard, NO name tag and NO jacket — only his purple shirt.
+5. The paper spec booklet on the desk is clearly OPEN and flat, pages up — NOT closed.
+6. A laptop on the desk has its lid OPEN (roughly 100 degrees, hinge on the rear edge away from camera) and its screen is completely DARK — no red banner, no glowing content.
+7. There is exactly ONE drinking vessel in the entire frame: a single EMPTY clear glass beer mug on the desk — no liquid visible in it, and NO second glass, tumbler, cup or bottle anywhere.
+8. There are exactly THREE empty cans on the desk (two crushed lying down plus one upright) — not two, not four.
+9. The cardboard tray is EMPTY — no stack of paper slips.
+10. A floor-to-ceiling glass window wall is on frame RIGHT with Tokyo Tower visible outside; the window wall has NO handle, latch or hinge hardware on it.
+11. Time of day: SOFT MORNING daylight — bright daytime sky outside, NOT night, NOT dusk/orange, no lit lantern glow dominating, no dark sky.
+12. No other person is in the frame (Yametaro is alone; no Fukuchan, no other people).
+13. Style: photorealistic live-action-style office interior (real materials, real daylight), with Yametaro alone rendered as a soft matte 3D chibi toy figure — the overall image is NOT flat 2D anime, NOT cartoon lineart.

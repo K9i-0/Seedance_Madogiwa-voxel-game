@@ -1,0 +1,17 @@
+model: qwen3-vl:8b
+image: 03_SCRIPTS/26_kansha_no_bug_ichimankai/ch1_start.png
+1. PASS — Single coherent scene with no text/watermarks visible  
+2. PASS — Yametaro has black bowl-cut hair, pink blush, purple shirt, slumped posture, closed mouth, and looks down at open paper  
+3. PASS — Small round white-rimmed glasses (not rectangular/thick dark) are present  
+4. PASS — No lanyard/name tag/jacket; only purple shirt visible  
+5. PASS — Paper spec booklet is clearly open and flat on desk  
+6. PASS — Laptop lid is open (~100 degrees), screen completely dark  
+7. PASS — One empty clear glass beer mug (no liquid) with no other drinking vessels  
+8. PASS — Three empty cans: two crushed lying down + one upright  
+9. PASS — No cardboard tray present, so "empty" condition met; no paper slip stacks  
+10. PASS — Floor-to-ceiling window wall shows Tokyo Tower with no hardware visible  
+11. PASS — Bright daytime sky (soft morning daylight) with no night/dusk/orange hues  
+12. PASS — Only Yametaro is present in the frame  
+13. PASS — Photorealistic office interior with Yametaro as soft matte 3D chibi figure (not flat 2D anime)  
+
+VERDICT: PASS

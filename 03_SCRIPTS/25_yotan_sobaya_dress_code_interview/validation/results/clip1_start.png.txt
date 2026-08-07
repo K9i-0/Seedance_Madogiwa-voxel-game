@@ -1,0 +1,15 @@
+model: qwen3-vl:8b
+image: 03_SCRIPTS/25_yotan_sobaya_dress_code_interview/clip1_start.png
+1. PASS — No text, labels, or watermarks visible in the frame  
+2. PASS — Perspective shows interior room looking toward half-open hallway door  
+3. PASS — Door hinges on left edge (camera view), silver lever handle at mid-height on free right edge (opposite hinges)  
+4. PASS — Slim man with shoulder-length blond hair, round sunglasses, and black leather biker jacket is halfway through doorway  
+5. PASS — Electric guitar securely slung across body, one hand holds neck (guitar present)  
+6. PASS — Yotan’s mouth is fully closed (no open mouth visible)  
+7. PASS — Simple interview table and two chairs are present in the room  
+8. PASS — Closed side door on right wall has silver lever handle at mid-height on left edge (hinge on right edge)  
+9. PASS — No trace of Sobaya (mask, beer mug, or body parts visible)  
+10. PASS — Warm, bright daytime lighting with no dark/night mood elements  
+11. PASS — Consistent polished anime illustration style (not a photo collage)  
+
+VERDICT: PASS

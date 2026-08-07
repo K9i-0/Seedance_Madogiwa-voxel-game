@@ -1,0 +1,17 @@
+model: qwen3-vl:8b
+image: 03_SCRIPTS/26_kansha_no_bug_ichimankai/ch1_end.png
+1. FAIL — Coca-Cola label visible on the can in the foreground  
+2. FAIL — Yametaro sits on a box next to the desk, not "behind" it as specified  
+3. PASS — Small round white-rimmed glasses are present and correctly styled  
+4. PASS — No lanyard, name tag, or jacket worn by Yametaro  
+5. PASS — The paper spec booklet is open and flat on the desk  
+6. PASS — Laptop lid is open (~100 degrees) with a dark screen  
+7. FAIL — The drinking vessel is a small clear glass (not a beer mug), contradicting the specified "beer mug"  
+8. PASS — Exactly three empty cans (two crushed, one upright) on the desk  
+9. FAIL — No cardboard tray exists in the frame to be "empty"  
+10. PASS — Window wall on the right shows Tokyo Tower with no visible handles/latches  
+11. PASS — Bright daytime lighting matches soft morning conditions  
+12. PASS — Only Yametaro is present in the frame  
+13. PASS — Photorealistic office interior with Yametaro as a 3D chibi (not flat 2D anime)  
+
+VERDICT: FAIL

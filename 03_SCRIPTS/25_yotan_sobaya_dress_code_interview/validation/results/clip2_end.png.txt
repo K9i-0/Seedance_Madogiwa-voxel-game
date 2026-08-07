@@ -1,0 +1,16 @@
+model: qwen3-vl:8b
+image: 03_SCRIPTS/25_yotan_sobaya_dress_code_interview/clip2_end.png
+1. PASS — No text, labels, or watermarks visible in the frame  
+2. PASS — The right-side door is open with a silver lever handle at mid-height on its free left edge (hinged on right)  
+3. PASS — The back entrance door is fully closed with a silver lever handle at mid-height on its right edge (hinges on left)  
+4. PASS — Sobaya has gray skin, a white mask covering his face entirely, and wears a white short-sleeve T-shirt  
+5. PASS — Sobaya holds an upright clear beer mug that is roughly half-full of beer  
+6. PASS — Only one beer mug appears in the frame with no other drinkware visible  
+7. PASS — Yotan has shoulder-length blond hair, round sunglasses, and a black leather jacket while pointing at Sobaya with his free hand (left hand on guitar neck)  
+8. PASS — Yotan’s mouth is open mid-retort; Sobaya’s masked face shows no visible mouth or speaking gesture  
+9. PASS — Sobaya is visibly taller and broader than Yotan in the frame  
+10. PASS — Both characters display friendly/comedic body language with no signs of anger, fear, or dark mood  
+11. PASS — Warm, bright interior lighting matches previous frames without sudden darkness or night mood  
+12. PASS — Polished anime art style is consistent with prior frames  
+
+VERDICT: PASS
