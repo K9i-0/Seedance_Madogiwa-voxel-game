@@ -434,17 +434,20 @@ Copy each chapter's Motion prompt into the workflow JSON EXACTLY as written here
 summarize or shorten. If it seems too long, go back to the script and split the chapter.
 
 ### Step 3 — Final audio track (assembly)
-The audio embedded in generated chapters is NOT the final dialogue audio. During assembly:
-1. For every dialogue chapter, strip the embedded audio and lay the original wavs from the
-   Dialogue audio table over the video, aligned to the frame where the speaker's mouth starts moving.
-2. Chapters without dialogue may keep their generated ambient audio.
-3. Play back the assembled video before delivery and confirm every line is the local
-   Irodori-TTS / VOICEVOX take (the source wavs are the single source of truth).
+H3's embedded audio has been verified faithful to the attached wavs (2026-08 pilot: envelope
+match + listening check). During assembly:
+1. DEFAULT: keep the embedded audio for ALL chapters (dialogue and ambient alike) — no re-laying,
+   no offset work.
+2. ONLY IF the pilot audio check for THIS run hears degradation, doubling or a changed voice:
+   strip the embedded audio on dialogue chapters and lay the original wavs from the Dialogue
+   audio table over the video, aligned to the frame where the speaker's mouth starts moving.
+3. Play back the assembled video before delivery and confirm every line sounds like the local
+   Irodori-TTS / VOICEVOX take (the source wavs remain the reference for this check).
 ```
 
 ## 8. 結合と最終音声（ffmpeg）
 
-1. **チャプター単位で音声を確定させる**（セリフ入りチャプターは埋め込み音声を捨て、ローカルwavを口の動きに合わせたオフセットで載せる）:
+1. **チャプター単位で音声を確定させる**。**既定は埋め込み音声をそのまま使う**: 2026-08の実測（Colab L4・adhoc1）で、H3の埋め込み音声は入力wavと同等（エンベロープ一致・聴感で劣化なし）と確認済みのため、セリフ入りチャプターも`cp chN.mp4 chN_final.mp4`でよい。**パイロットの音声チェックで劣化・二重声・別人化を検出したランに限り**、埋め込み音声を捨ててローカルwavを口の動きに合わせたオフセットで載せ直す（フォールバック手順）:
 
 ```
 # offset: 話者の口が動き始めるフレームの時刻（ms）。動画を確認して決める

@@ -137,7 +137,8 @@
         0
       ],
       "filename_prefix": "video/ch1",
-      "format": "auto"
+      "format": "auto",
+      "codec": "auto"
     }
   },
   "200": {
