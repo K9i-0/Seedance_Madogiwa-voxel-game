@@ -7,7 +7,7 @@ description: 窓際族物語の動画をクラウドを使わずフルローカ�
 
 **実行主体はClaude CodeまたはCursor。Codexはこのスキルを使わない**（Codexの担当は既存の`/seedance`のみ。そのため本スキルは`.agents/skills/`にsymlinkせず、Cursor向けの`.cursor/skills/`にのみsymlinkしてある）。
 
-ユーザーから「**ローカルで動画作成して**」と指示されたら、`/seedance`（CapCut/クラウド生成）ではなくこのスキルを使う。台本・音声・キーフレームの考え方は`/seedance`と同じ構造で、動画生成だけをクラウドのSeedance 2.0から**ローカルのMiniMax H3（ComfyUI）**に置き換えたものである。
+ユーザーから「**ローカルで動画作成して**」と指示されたら、`/seedance`（CapCut/クラウド生成）ではなくこのスキルを使う。台本・音声・キーフレームの考え方は`/seedance`と同じ構造で、動画生成だけをクラウドのSeedance（CapCut）から**ローカルのMiniMax H3（ComfyUI）**に置き換えたものである。
 
 ワークフロー全体（順に実行する）:
 

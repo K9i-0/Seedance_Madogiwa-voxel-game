@@ -129,11 +129,12 @@ def main() -> None:
                 continue
             filename = (declaration.group(1) or declaration.group(2)).strip()
             if label == "Audio":
+                # Declarations without an attached file are allowed for two cases:
+                # ambience-only clips ("Seedance-generated ...") and mob-character
+                # lines with no voice sample ("No audio file attached; ..." —
+                # VOICE_CAST.md characters still require a sample per SKILL.md).
                 normalized_audio = filename.lower().rstrip(".")
-                if normalized_audio in {
-                    "seedance-generated voice (no local audio file; generated inside seedance)",
-                    "seedance-generated ambience only; no local audio file, no voice, narration, or caption readout",
-                }:
+                if normalized_audio.startswith(("seedance-generated", "no audio file attached")):
                     continue
             if Path(filename).name != filename:
                 errors.append(f"Clip {clip}: {label} must use a bundled basename, not path: {filename}")
