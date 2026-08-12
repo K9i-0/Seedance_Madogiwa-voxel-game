@@ -1,9 +1,9 @@
 ---
 name: colab-video
-description: 窓際族物語の動画のH3生成工程（/local-videoのステップ7）だけをGoogle Colab（CUDA GPU）で実行する派生ワークフロー。ローカルMacにCUDA GPUが無くMiniMax H3を実行できないとき、ユーザーから「Colabで動画を作って」「H3をColabで回して」と指示されたときに必ず使用する。台本・音声・キーフレーム生成・画像検証（ステップ1〜6）と最終結合（ステップ8〜9）はローカルで行い、H3動画生成だけを同梱ノートブックでColabに切り出す。無料T4は配管検証用、本番生成はL4（Pay As You Go / Colab Pro）。
+description: 窓際族物語の動画生成工程（/local-videoのステップ7）だけをGoogle Colab（CUDA GPU）で実行する派生ワークフロー。ローカルMacにCUDA GPUが無くMiniMax H3を実行できないとき、ユーザーから「Colabで動画を作って」「H3をColabで回して」「LTXで動画を作って」と指示されたときに必ず使用する。台本・音声・キーフレーム生成・画像検証（ステップ1〜6）と最終結合（ステップ8〜9）はローカルで行い、動画生成だけを同梱ノートブック（H3=h3_colab.ipynb / LTX-2.5=ltx25_colab.ipynb）でColabに切り出す。セリフ（wav駆動リップシンク）はH3、セリフなしI2VチャプターはLTX-2.5も選べる。無料T4は配管検証用、本番生成はL4/A100（Pay As You Go / Colab Pro）。
 ---
 
-# Colab動画制作ワークフロー（MiniMax H3 on Google Colab）
+# Colab動画制作ワークフロー（MiniMax H3 / LTX-2.5 on Google Colab）
 
 **実行主体はClaude CodeまたはCursor。Codexはこのスキルを使わない**（`/local-video`と同じ扱い。`.cursor/skills/`にのみsymlinkし、`.agents/skills/`には張らない）。
 
@@ -152,3 +152,40 @@ seedance形式のラン（クリップ・CapCut inputs・`@ImageN`/`@Audio1`タ�
 5. **workflow生成**: `build_h3_workflow.py`（local-videoスキル同梱・codec対応版）をラン直下にコピーして`chN_workflow.json`を生成。`h3_run.py`も同梱してからzipする。
 6. **atmosphere参照（ポスター等）はH3入力にしない**（雰囲気はキーフレームに焼き込み済み。文字漏れリスクも避けられる）。
 7. パイロットは**セリフのあるチャプター**。チェックリストはseedanceランの`script.md`の生成プロトコルを使い、音声の項だけ「添付wavそのものが鳴っているか」に読み替える。
+
+## 8. LTX-2.5モード（セリフなしI2Vチャプターの代替エンジン）
+
+H3の代わりに**LTX-2.5**（Lightricks・2026-08公開のオープンウェイト動画生成モデル）でチャプターを生成する派生モード。ノートブックは`ltx25_colab.ipynb`（本スキル同梱・セル番号体系はH3版と同じ）。**H3と併用でき、どちらの重み・成果物もDriveの別ディレクトリ（`ltx25_weights` / `ltx25_outputs`）に共存する。**
+
+### 使い分け（重要）
+
+| | MiniMax H3（`h3_colab.ipynb`） | LTX-2.5（`ltx25_colab.ipynb`） |
+|---|---|---|
+| セリフあり（R2V相当） | ◎ wav駆動リップシンク | **不可**（添付wavで駆動する入力が無い） |
+| セリフなしI2V（開始/終了フレーム固定） | ◎ fl2va | ◎ LTXVAddGuide×2（frame_idx 0 / -1） |
+| 音声 | 添付wavをそのまま埋め込み | プロンプトのSoundscape/Music記述から**自動生成**（合わなければローカルで差し替え） |
+| ステップ数 | 20 | 蒸留8（速度はColab未実測 — パイロットで計測） |
+| 重み | GPU別バリアント・約75GB | **int8一式・約39GBがL4/A100共通**（切替なし・ユニット入れ替えなし） |
+
+**セリフチャプターは必ずH3。**LTXは「セリフなしチャプターだけのラン」または「混在ランのセリフなし分」に使い、混在ランは両ノートブックで生成したmp4を同じラン直下に集めて結合する。
+
+### 前提（H3との差分）
+
+- **HFリポジトリ`Lightricks/LTX-2.5`はゲート付き**: 初回に https://huggingface.co/Lightricks/LTX-2.5 で「Agree and Access」を押してライセンス承諾し、READ権限（gated reposアクセス可）のHFトークンをColabのシークレット（鍵アイコン → `HF_TOKEN`）に登録する。重みがDrive配置済みのセッションではトークン不要。ノートブックはトークンでリダイレクトを解決してからaria2でDLする。
+- ライセンスはLTX-2 Community License（**年間収益1000万ドル以下なら商用利用可**）。
+- **Drive容量の指針**: LTX int8一式は約39GB。H3の通常運用（共通33GB＋ユニットペア42GB≒75GB）と併存させるとGoogle One 100GBに収まらない。選択肢: ①H3を片ユニット運用（33＋21=54GB）にして計93GBで100GBに収める（I2VをLTXへ移すならH3のfl2vaを消す運用と相性がよい）、②200GBプラン（月¥380）にする、③LTXはDrive配置せず毎セッションDL（39GB・aria2で15〜30分）。
+- 生成速度・L4（VRAM 22GiB）での1344x768生成の可否は**未実測**。OOM時は`--lowvram`→それでも駄目なら1120x640（同アスペクト比）へ落とす。確実なのはA100。
+
+### seedanceランからの変換（7章との差分）
+
+1. **尺のグリッドが違う**: LTXは**8k+1フレーム**（97, 121, 145, 193, ...）@24fps。H3の17k+5と取り違えない（ノートブックのセル5が検証する）。
+2. **workflow生成**: `build_ltx25_workflow.py`（本スキル同梱）をラン直下にコピーして`chN_workflow.json`を生成する。`h3_run.py`は不要（ランナーはノートブックに内蔵）。
+
+   ```
+   python3 build_ltx25_workflow.py --out ch1_workflow.json --prompt-file ch1_prompt.txt \
+       --frames 121 --first ch1_start.png --last ch1_end.png
+   ```
+
+3. **プロンプト変換**はH3のI2V変換と同じ（`@ImageN`宣言部を削除し同定句だけ残す、"starts EXACTLY on the attached first frame..."を足す）。**`Soundscape:`/`Music:`行は必ず残す** — LTXはここから音声を自動生成する。音声wavは投入しない（できない）。
+4. **バンドル要件**: `script.md`＋`ch*_start.png`/`ch*_end.png`＋`ch*_prompt.txt`＋`ch*_workflow.json`＋`build_ltx25_workflow.py`。wav・キャラクターシートは不要（I2Vは参照画像を取れない）。
+5. **パイロット**のチェックリストは「キーフレームアンカー・NG要素・尺・生成環境音の質」。環境音が合わなければ`ffmpeg -an`で消してローカルの音に差し替える（結合はlocal-videoステップ8と同じ）。
