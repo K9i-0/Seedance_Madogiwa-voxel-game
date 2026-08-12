@@ -89,7 +89,7 @@ def main() -> None:
         "130": {"class_type": "CreateVideo", "inputs": {
             "images": ["122", 0], "audio": ["121", 0], "fps": 24, "bit_depth": 8}},
         "92": {"class_type": "SaveVideo", "inputs": {
-            "video": ["130", 0], "filename_prefix": a.prefix, "format": "auto"}},
+            "video": ["130", 0], "filename_prefix": a.prefix, "format": "auto", "codec": "auto"}},
     }
 
     cond: dict = {

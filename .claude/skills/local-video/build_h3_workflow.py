@@ -90,7 +90,8 @@ def main() -> None:
         "130": {"class_type": "CreateVideo", "inputs": {
             "images": ["122", 0], "audio": ["121", 0], "fps": 24, "bit_depth": 8}},
         "92": {"class_type": "SaveVideo", "inputs": {
-            "video": ["130", 0], "filename_prefix": a.prefix, "format": "auto"}},
+            # codecはComfyUI新版(2026-08頃〜)で必須。旧版(v0.30)は未知の入力を無視するので常に付けてよい
+            "video": ["130", 0], "filename_prefix": a.prefix, "format": "auto", "codec": "auto"}},
     }
 
     cond: dict = {
