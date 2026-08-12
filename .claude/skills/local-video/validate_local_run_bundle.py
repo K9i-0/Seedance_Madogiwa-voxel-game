@@ -6,6 +6,7 @@ Checks every '### H3 inputs (Chapter N)' section in script.md:
 - R2V chapters stay within H3's input limits (<=9 pictures, <=3 audio, <=12 files total)
 - every Motion prompt redeclares its attachments via 'Required attached input files:'
 - every Motion prompt ends with sound-design lines ('Soundscape:' and 'Music:')
+- a '## Style block' section exists and every Motion prompt contains its one-line style lock verbatim
 - I2V chapters declare First/Last frame files
 - script.md does not reference paths outside the run directory
 """
@@ -51,6 +52,25 @@ def main() -> None:
     if re.search(r"(?:\.\./)+(?:02_CHARACTERS|03_SCRIPTS)/", text):
         errors.append("script.md references files outside the run; copy them into the run and use basenames")
 
+    style_block = ""
+    style_header = re.search(r"^##.*\bStyle block\b.*$", text, re.MULTILINE | re.IGNORECASE)
+    if style_header is None:
+        errors.append(
+            "script.md lacks a '## Style block' section "
+            "(one-line art-style lock, repeated verbatim in every keyframe prompt and Motion prompt; "
+            "prevents the art style drifting between anime and photoreal across the run)"
+        )
+    else:
+        for line in text[style_header.end():].splitlines():
+            stripped = line.strip().lstrip("-").strip()
+            if stripped.startswith("#"):
+                break
+            if stripped:
+                style_block = stripped
+                break
+        if not style_block:
+            errors.append("'## Style block' section is empty; write the one-line style lock under the header")
+
     sections = list(re.finditer(r"^### H3 inputs \(Chapter (\d+)\)\s*$", text, re.MULTILINE))
     if not sections:
         errors.append("no '### H3 inputs (Chapter N)' sections found")
@@ -85,6 +105,13 @@ def main() -> None:
                     "(sound design rule: end every Motion prompt with a Soundscape line for ambient/action "
                     'sounds and a Music line — default "Music: no background music")'
                 )
+
+        if prompt and style_block and style_block not in prompt:
+            errors.append(
+                f"Chapter {chapter}: Motion prompt lacks the verbatim Style block line "
+                "(copy the one-line style lock from '## Style block' into every Motion prompt; "
+                "paraphrasing it re-enables style drift)"
+            )
 
         if mode == "I2V":
             for label in ("First frame", "Last frame"):

@@ -7,7 +7,7 @@ description: 窓際族物語の動画をクラウドを使わずフルローカ�
 
 **実行主体はClaude CodeまたはCursor。Codexはこのスキルを使わない**（Codexの担当は既存の`/seedance`のみ。そのため本スキルは`.agents/skills/`にsymlinkせず、Cursor向けの`.cursor/skills/`にのみsymlinkしてある）。
 
-ユーザーから「**ローカルで動画作成して**」と指示されたら、`/seedance`（CapCut/クラウド生成）ではなくこのスキルを使う。台本・音声・キーフレームの考え方は`/seedance`と同じ構造で、動画生成だけをクラウドのSeedance 2.0から**ローカルのMiniMax H3（ComfyUI）**に置き換えたものである。
+ユーザーから「**ローカルで動画作成して**」と指示されたら、`/seedance`（CapCut/クラウド生成）ではなくこのスキルを使う。台本・音声・キーフレームの考え方は`/seedance`と同じ構造で、動画生成だけをクラウドのSeedance（CapCut）から**ローカルのMiniMax H3（ComfyUI）**に置き換えたものである。
 
 ワークフロー全体（順に実行する）:
 
@@ -26,7 +26,7 @@ description: 窓際族物語の動画をクラウドを使わずフルローカ�
 本スキルは`/seedance`のワークフロー構造を継承する。**次のルール群は`.claude/skills/seedance/SKILL.md`に書かれているものをそのまま適用する**（本ファイルには差分だけを書く。作業前に該当セクションを必ず読むこと）:
 
 - **ステップ0（出力ディレクトリ・参照同梱）**: ラン専用ディレクトリ`03_SCRIPTS/<NN>_<slug>/`の命名、キャラクターシート等を物理ファイルとして同梱、basename参照、正典非改変 — すべて同一。
-- **ステップ1（台本作成）**: Story Formula・禁止事項、Prop state ledger、物理整合性ルール、Scene ledger（場所・時間帯の通し台帳）と場面転換の整合性ルール（昼夜ジャンプ防止）、Fixture layout（機構小物）、話者分離（1生成単位1話者）、リップシンク精度（尺≒発話長＋約1秒）、言語ルール（script.mdは英語、セリフのみ日本語）、話者バインディング — すべて同一。「クリップ」を本スキルでは「チャプター」と読み替える。
+- **ステップ1（台本作成）**: Story Formula・禁止事項、Prop state ledger、物理整合性ルール、Scene ledger（場所・時間帯の通し台帳）と場面転換の整合性ルール（昼夜ジャンプ防止）、Fixture layout（機構小物）、画風固定ルール（`## Style block`・全プロンプトへの逐語埋め込み）、キャラクター人数の固定（増殖防止）、話者分離（1生成単位1話者）、リップシンク精度（尺≒発話長＋約1秒）、言語ルール（script.mdは英語、セリフのみ日本語）、話者バインディング — すべて同一。「クリップ」を本スキルでは「チャプター」と読み替える。
 - **ステップ2（セリフ音声）**: 配役の正典は`02_CHARACTERS/VOICE_CAST.md`。Irodori-TTSボイスクローン（そば屋・福ちゃん・やめたろう・おかやまん・よーたん）とVOICEVOX、そば屋のモンスターボイス加工、無音トリム、Dialogue audio表、VOICEVOXクレジット義務 — すべて同一。**スクリプトもseedance同梱のものをそのまま使う**（`irodori_speak.sh` / `voicevox_speak.sh` / `sobaya_monsterize.sh`）。
 
 キーフレーム生成の技法（draw-things-cli固有）は本ファイルのステップ5に完結して書いてある（seedance側がCodex生成のままのバージョンでも本スキル単独で動くようにするため）。
@@ -306,7 +306,7 @@ ffmpeg -y -i ch3_line1_fukuchan.wav -af "apad=whole_dur=2.0" ch3_line1_fukuchan_
 
 ### 画風の決定（プロンプトを書く前に必ずやる）
 
-画風は思い込みで決めず、**そのランに登場する全キャラの`*_sheet.png`と、`03_SCRIPTS/`の直近ランの`clip1_start.png`（またはch1_start.png）をReadで開いて確認してから**、画風固定文を書き起こす。このIPの画風は「アニメ絵」ではない: 窓際メンバーの多くは実写写真のシート、無職やめたろうだけがマットな3Dチビ人形で、**実写調の空間に両者が同居する絵**が確立した画風。`anime style`/`cartoon style`と書いてはいけない。確定した画風固定文は**全フレームのプロンプト末尾に毎回同じ文で**入れる。
+画風は思い込みで決めず、**そのランに登場する全キャラの`*_sheet.png`と、`03_SCRIPTS/`の直近ランの`clip1_start.png`（またはch1_start.png）をReadで開いて確認してから**、画風固定文を書き起こす。このIPの画風は「アニメ絵」ではない: 窓際メンバーの多くは実写写真のシート、無職やめたろうだけがマットな3Dチビ人形で、**実写調の空間に両者が同居する絵**が確立した画風。`anime style`/`cartoon style`と書いてはいけない。確定した画風固定文は**`script.md`の`## Style block`セクションに1行で書き、全キーフレーム生成プロンプトと全Motion promptに毎回一字一句同じ文で**入れる（seedanceステップ1「画風固定ルール」と同一。`validate_local_run_bundle.py`が逐語埋め込みを機械検証する）。
 
 ### 参照の渡し方と生成順序（チェーン）
 
@@ -372,7 +372,8 @@ EOF
 4. **Scene ledgerの該当セルとの一致**（場所と時間帯・光。昼の場面なのに夜景・夜空・点灯した提灯になっていないか等）
 5. **Fixture layoutとの一致**（蝶番側・ノブ側・開き方向）
 6. **話者の口の開閉**（セリフのあるチャプター: 話者は口が開き、非話者は閉じている）
-7. **画風の一致**（そのランの画風固定文と合っているか）
+7. **画風の一致**（そのランの画風固定文と合っているか。チェーンの進行でアニメ調⇄実写調にドリフトしていないか）
+8. **キャラクターの人数**（フレーム内の人物数が台本と一致し、同一キャラが2人以上写っていない）
 
 - `verify_frame.py`は`VERDICT: PASS`/`VERDICT: FAIL`＋指摘リストを返す。**FAILだけでなくPASSでも指摘内容を読み、ClaudeもReadで画像を開いて突き合わせる**（VLMの見落とし・誤検出の両方があり得る。最終判断はClaudeが行う）。
 - 隣接フレーム間の整合（つなぎ目共有、金具位置の連続性、状態遷移に対応する動作の有無、時間帯・照明の連続性）はVLMの単画像検証では見えないため、**Prop state ledger・Scene ledgerの1行ごとに全フレームを時系列で見比べる最終チェック**をClaudeが行う（動作なしに状態が飛んでいる境界、画面内の時間経過描写なしに昼夜・光が変わる境界があれば修正リストに載せる）。
@@ -424,6 +425,8 @@ Generate ONLY the first dialogue chapter, then verify ALL of the following:
 - [ ] The video starts/ends on (or acceptably close to) the start/end keyframes — check R2V frame anchoring
 - [ ] Motion, poses, prop states and fixture hardware match the Motion prompt / ledgers
 - [ ] Character identity and NG-change elements survive H3 generation (compare against the sheets)
+- [ ] Every named character appears EXACTLY ONCE in EVERY frame — no duplicated characters or props, especially during appear/disappear/handoff actions
+- [ ] The art style matches the run's Style block and the keyframes, and stays consistent through the whole chapter
 - [ ] Ambient sound and music match the prompt's Soundscape/Music lines (no unrequested background music)
 - [ ] Duration matches the H3 inputs table (remember the 17k+5-frame grid rounding)
 If any check fails, fix the workflow inputs/prompt and regenerate the pilot until all pass.
@@ -476,6 +479,6 @@ ffmpeg -y -i final_draft.mp4 -vf "drawtext=fontfile='/System/Library/Fonts/ヒ�
 python3 .claude/skills/local-video/validate_local_run_bundle.py 03_SCRIPTS/<NN>_<slug>
 ```
 
-検証内容: H3 inputs表の全ファイルがラン直下に物理ファイルとして存在する / R2Vチャプターの入力が「画像9・音声3・合計12」以内 / 各Motion promptが`Required attached input files:`で全`<Picture N>`/`<Audio N>`をファイル名ごと再宣言している / 各Motion promptに音響指定（`Soundscape:`と`Music:`）がある / I2VチャプターにFirst/Last frameがある / `script.md`がラン外パスを参照していない。
+検証内容: H3 inputs表の全ファイルがラン直下に物理ファイルとして存在する / R2Vチャプターの入力が「画像9・音声3・合計12」以内 / 各Motion promptが`Required attached input files:`で全`<Picture N>`/`<Audio N>`をファイル名ごと再宣言している / 各Motion promptに音響指定（`Soundscape:`と`Music:`）がある / `## Style block`セクションが存在し各Motion promptに画風固定文が逐語で含まれている / I2VチャプターにFirst/Last frameがある / `script.md`がラン外パスを参照していない。
 
 **検証が失敗したままユーザーへ完了報告してはいけない。**

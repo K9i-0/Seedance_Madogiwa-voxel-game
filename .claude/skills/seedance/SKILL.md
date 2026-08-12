@@ -17,7 +17,7 @@ description: 窓際族物語のストーリー（あらすじ）からSeedance�
 
 ### 精度の要（この方式にする理由）
 
-動画生成は**CapCutに統合されたSeedance 2.0**を使う。CapCutは**開始フレームだけでなく「開始＋終了フレーム（Frame A / Frame B）」入力に対応**しており、両端を固定して間を補間させることで、単一フレーム/text-to-videoで起きる**キャラのブレ（identity drift）・ちらつき・構図ズレを減らせる**。さらに**参照画像を多数**渡してキャラの同一性を固定できる。本スキルはこの両方を最大限使う設計にする。中間キーフレーム入力は存在しないため、**細かい動きの制御はクリップを短く割る**ことで代替する。
+動画生成は**CapCutに統合されたSeedance**を使う。**使用するSeedanceのバージョンはユーザーの指定が正**（指定がなければ現行既定の**Seedance 2.5**を使う。使用バージョンは`script.md`のProduction intentに明記する。本スキル内の技法・制約は2.0時代の実測に基づくが、2.5でも同じ前提で運用する）。CapCutは**開始フレームだけでなく「開始＋終了フレーム（Frame A / Frame B）」入力に対応**しており、両端を固定して間を補間させることで、単一フレーム/text-to-videoで起きる**キャラのブレ（identity drift）・ちらつき・構図ズレを減らせる**。さらに**参照画像を多数**渡してキャラの同一性を固定できる。本スキルはこの両方を最大限使う設計にする。中間キーフレーム入力は存在しないため、**細かい動きの制御はクリップを短く割る**ことで代替する。
 
 ## 前提となる参照ファイル
 
@@ -131,7 +131,7 @@ Seedanceの1クリップは4〜15秒。**動きが複雑・カメラワークが
 
 ### 話者分離ルール（1クリップ1話者・重要）
 
-Seedance 2.0は**複数人が映るクリップでのリップシンクの話者割り当てが弱い**（公式にも未解決の課題とされ、実際に「福ちゃんの音声でやめ太郎の口が動く」取り違えが起きた）。これを防ぐため:
+Seedanceは**複数人が映るクリップでのリップシンクの話者割り当てが弱い**（2.0時代に公式にも未解決の課題とされ、実際に「福ちゃんの音声でやめ太郎の口が動く」取り違えが起きた。2.5でも同じ前提で運用する）。これを防ぐため:
 
 - **1クリップにつき話者は1人を原則とする。** 会話の掛け合いは、話者が交代するタイミングでクリップを分割する（分割はつなぎ目共有フレームで滑らかに繋がるので尺・演出上の不利益はない）。
 - 掛け合いのテンポ上どうしても1クリップに複数話者を入れる場合は、(1) 音声ファイルを発話順に分けて添付し、(2) Motion promptに話者の順番・誰がどの音声かを@メンションと見た目で明示し、(3) "the two lines do NOT overlap" を入れ、(4) **発話順に安定した話者ID（`(S1)`/`(S2)`）を各話者に振り、Motion prompt内でその話者に言及するたびに同じIDを添える**（公式H3ガイドの話者ID記法。@メンション＋同定句への追加の保険。クリップ内でIDを振り直さない。例: "Fukuchan (@Image3, the slim stylish black-haired man) (S1) speaks first; Yametaro (@Image4, the chibi man with round glasses) (S2) replies"）。それでも取り違えが出たら迷わずクリップを割る。
@@ -175,9 +175,34 @@ Seedanceはプロンプト内の日本語セリフ引用や添付音声につら
 
 `validate_run_bundle.py`が各Motion prompt内の`Soundscape:`と`Music:`の記載を機械検証する。
 
+### 画風固定ルール（Style block・全プロンプト共通・重要）
+
+画風は思い込みで決めず、**そのランに登場する全キャラの`*_sheet.png`と直近ランのキーフレームをReadで開いて確認してから**、そのラン全体の画風固定文（Style block）を英語1行で確定する。このIPの確立した画風は「アニメ絵」ではない: 窓際メンバーの多くは実写写真ベースのシートで、実写調の空間にそのまま同居させ、無職やめたろうだけがマットな3Dチビ人形として描かれる。**シートが実写写真のキャラに`anime illustration`/`cartoon style`等を宣言してはいけない**（過去に実際に発生: 参照シートは実写なのに台本冒頭で`anime illustration look`と宣言し、かつ各プロンプトに画風の句を入れなかった結果、キーフレームチェーンがアニメ調で始まりシートに引かれて実写調へ18クリップかけてドリフトし、1本の動画の中で画風が変わってしまった）。
+
+- **`script.md`の冒頭（Scene ledgerの近く）に`## Style block`セクションを置き、画風固定文を1行で書く**（箇条書きにせず地の文1行。逐語一致の機械検証対象になるため改行で分割しない）。
+- **全キーフレーム生成プロンプトと全Motion promptに、この画風固定文を毎回一字一句同じ文で入れる。** Production intent（冒頭の説明文）に書くだけでは各生成プロンプトに反映されず、チェーン生成が参照シートの画風へ勝手にドリフトする。言い換え・要約も禁止（表記ゆれ自体がドリフトの原因になる）。
+- **キーフレームの目視確認に画風を含める**: 新しいフレームを生成するたびにクリップ1の開始フレームと並べ、画風（実写/アニメ/3D調・質感・色乗り）が揃っているか確認する。ドリフトしていたら、画風固定文＋前フレーム＋シートを種にそのフレームを作り直してからチェーンを続ける。
+- `validate_run_bundle.py`が`## Style block`セクションの存在と、各Motion promptへの画風固定文の逐語埋め込みを機械検証する。
+
+### キャラクター人数の固定（増殖防止・重要）
+
+人数の指定がないと、生成モデルは登場・退場・受け渡し・出入りの動作を**「もう1人生やす」ことで補間する**ことがある（過去に実際に発生: 「そば屋がボトルを受け取って土に還る」クリップで、立ったままのそば屋と土に潜るそば屋の2人が同時に生成され、瓶まで増殖した。キーフレーム両端は正しくても、間の補間で複製が起きる）。これを防ぐため:
+
+- **全クリップのMotion promptに、画面内の総人数と「各キャラは1人だけ」を明記する**: 例 "Exactly four people are on screen: Yotan, Tokun, Sobaya and Fukuchan — each character appears EXACTLY ONCE; there is only ONE Sobaya in the frame at all times, he is NEVER duplicated"。
+- **登場・退場・変身・物の受け渡しなど人数や配置が変わる動作のあるクリップでは、否定形まで必ず入れる**: 例 "Sobaya moves as ONE continuous person — he does NOT split into two; no copy of him remains standing while he descends into the hole"。
+- **キーフレーム生成プロンプトと目視確認にも人数を含める**: フレーム内の人物数が台本と一致しているか、同一キャラが2人以上写っていないかを確認する。
+- パイロット検証チェックリスト（ステップ5）でも、生成動画の**全フレーム**で人数・重複をチェックする（キーフレームが正しくても補間中だけ複製が現れることがある）。
+
 ### セリフ音声の扱い（ローカル音声はボイスサンプル・実音声はSeedanceが生成・重要）
 
-ステップ2で生成する音声ファイル（キャラごとにVOICEVOXまたはIrodori-TTS。配役は`VOICE_CAST.md`が正）は、**Seedanceに渡すボイスサンプル（声質・話し方・セリフ内容の参照）**である。**最終動画のセリフ・ナレーション音声はSeedanceが動画と一緒に生成する**（口の動きは自身が生成する音声に自然に同期するため、リップシンクのずれが起きにくい）。セリフのあるクリップでサンプル音声の生成・添付を省略し、声の指定なしにSeedance任せにすることは禁止（クリップごとに声質がブレるため）。ユーザーから別途音声ファイルが渡された場合は、そのクリップに限りユーザー提供の音声をサンプルとして優先する。
+ステップ2で生成する音声ファイル（キャラごとにVOICEVOXまたはIrodori-TTS。配役は`VOICE_CAST.md`が正）は、**Seedanceに渡すボイスサンプル（声質・話し方・セリフ内容の参照）**である。**最終動画のセリフ・ナレーション音声はSeedanceが動画と一緒に生成する**（口の動きは自身が生成する音声に自然に同期するため、リップシンクのずれが起きにくい）。**正典キャラ（`VOICE_CAST.md`に配役があるキャラ）のセリフで**サンプル音声の生成・添付を省略し、声の指定なしにSeedance任せにすることは禁止（クリップごとに声質がブレるため）。ユーザーから別途音声ファイルが渡された場合は、そのクリップに限りユーザー提供の音声をサンプルとして優先する。
+
+**例外 — モブキャラの音声（サンプル添付なしを許可）**: `VOICE_CAST.md`に配役の無いモブキャラ・その場限りのキャラ（通行人・店員・群衆・アナウンス等）のセリフや鳴き声は、**ボイスサンプルなしでSeedanceに直接生成させてよい**。その場合は次を守る:
+
+- CapCut inputs表のAudio行に、添付なしであることを明示的に宣言する（例: `No audio file attached; generate speech directly from the Japanese text in the motion prompt`。ナレーションも声も無いクリップは `No audio file attached; no voice, narration or caption readout`）。`validate_run_bundle.py`は`Seedance-generated`または`No audio file attached`で始まるAudio宣言を「添付なしで正」と扱う。
+- Motion promptにそのモブの**声質の指定**（性別・年齢感・トーン。例: "a generic cheerful middle-aged male shopkeeper voice"）を書く。声の指定ゼロでSeedance任せにしない。
+- 正典キャラと同じクリップで話す場合、話者バインディング（@メンション＋同定句＋非話者の口閉じ）は従来どおり必須。モブの声が正典キャラのサンプルに寄らないよう "the shopkeeper's voice is DIFFERENT from the attached sample @Audio1" のような分離指示を添える。
+- **同一モブが複数クリップで話す場合はクリップ間で声質がブレる**前提でよいか判断する。ブレが問題になるモブは`VOICE_CAST.md`に配役を追加し、正典キャラと同じサンプル運用に昇格させる。
 
 生成したサンプル音声は**Seedance（CapCut）生成時に添付ファイルとして渡し、「この声・この話し方でこのセリフを発話させる」よう指示する**。
 
@@ -189,7 +214,7 @@ Seedanceはプロンプト内の日本語セリフ引用や添付音声につら
 
 モデルはキャラ名を知らないため、名前だけ書くと**別のキャラの口が動く取り違え**が起きる。セリフのあるクリップでは以下を必ず行う:
 
-- **@メンションで役割を固定する**: Seedance 2.0（Omni Reference）は添付ファイルを`@Image1`/`@Audio1`のようにプロンプト内で参照し役割を指定できる。Motion promptで音声サンプルと参照画像を明示的に結びつける: "ONLY Fukuchan (@Image3, the stylish man in the ...) speaks, in the voice of the sample @Audio1"。
+- **@メンションで役割を固定する**: Seedance（Omni Reference）は添付ファイルを`@Image1`/`@Audio1`のようにプロンプト内で参照し役割を指定できる。Motion promptで音声サンプルと参照画像を明示的に結びつける: "ONLY Fukuchan (@Image3, the stylish man in the ...) speaks, in the voice of the sample @Audio1"。
 - **話者は名前＋見た目の同定句で指定する**: キャラ名単独ではなく "Fukuchan — the slim stylish black-haired man in a black long coat" のように、参照画像から一意に分かる外見描写を毎回添える。同定句は各キャラ設定md（`02_CHARACTERS/0N_*.md`）の「プロンプト用同定句（英語）：」を正典として使い、クリップごとに言い換えない（表記ゆれ自体が取り違えの原因になる）。
 - **話さないキャラは否定形で口を閉じさせる**: 画面内の非話者全員について "Yametaro (@Image4) does NOT speak — his mouth stays CLOSED, he only listens/reacts" を明記する。話者の指定だけでは足りず、非話者の禁止まで書くのが取り違え防止の肝。
 - `script.md` のCapCut inputs表に `Audio` 行を追加し、添付する音声ファイル名と「ボイスサンプルとしてSeedance生成の入力に添付する」ことを明記する（記載例は後述）。
@@ -197,7 +222,7 @@ Seedanceはプロンプト内の日本語セリフ引用や添付音声につら
 
 ## 2. セリフ音声の生成（全セリフ必須・2段階）
 
-台本が完成したら、**台本中のすべてのセリフ・ナレーションの音声をローカルで生成し、ラン専用ディレクトリに保存する**。このwavはSeedance（CapCut）生成時に**ボイスサンプルとして**添付し、Seedanceにその声・話し方でセリフ音声を生成させる（最終音声は生成された動画側が正。サンプルとの尺差は許容する）。
+台本が完成したら、**台本中のすべてのセリフ・ナレーションの音声をローカルで生成し、ラン専用ディレクトリに保存する**（例外: `VOICE_CAST.md`に配役の無いモブキャラのセリフは、ステップ1「セリフ音声の扱い」のモブ例外に従いサンプルなしでSeedance直接生成にしてよい。その場合ローカル生成は不要）。このwavはSeedance（CapCut）生成時に**ボイスサンプルとして**添付し、Seedanceにその声・話し方でセリフ音声を生成させる（最終音声は生成された動画側が正。サンプルとの尺差は許容する）。
 
 音声は**2段階**で作る: まず各セリフの候補として**等速と1.5倍速の2テイク**を生成してユーザーに聴いて選んでもらい、**採用テイクが確定してから**最終ファイル（正式名のwav）を用意する。**ユーザーの確認が取れるまで、最終ファイルの作成と以降の工程（キーフレーム生成・CapCut入力表の完成）へ進んではいけない**（クリップ尺Durationは採用音声の実測長に依存するため、先に進むと手戻りになる）。
 
@@ -301,7 +326,7 @@ Seedance用プロンプトを作成したら、`codex` CLIの画像生成ツー�
 ```
 codex exec -s workspace-write --enable image_generation \
   -i 03_SCRIPTS/<NN>_<slug>/Sobaya_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Tokun_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yotan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Fukuchan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yametaro_sheet.png \
-  "Use your image generation tool to create the FIRST-FRAME still of a video shot. Input images Image 1..5 are character sheets (front/side/back turnarounds of each character; Sobaya: keep face/mask/build; Tokun: keep aloha/hat/ukulele; Yotan: keep blond/guitar/rock outfit; Fukuchan: keep stylish outfit; Yametaro: keep design) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's START state, excluding dialogue and camera-work notation>. Comedic slice-of-life anime-illustration style, single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_start.png."
+  "Use your image generation tool to create the FIRST-FRAME still of a video shot. Input images Image 1..5 are character sheets (front/side/back turnarounds of each character; Sobaya: keep face/mask/build; Tokun: keep aloha/hat/ukulele; Yotan: keep blond/guitar/rock outfit; Fukuchan: keep stylish outfit; Yametaro: keep design) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's START state, excluding dialogue and camera-work notation>. <the run's Style block line, verbatim from ## Style block>. Single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_start.png."
 ```
 
 終了フレーム（開始フレームを種にする）:
@@ -309,7 +334,7 @@ codex exec -s workspace-write --enable image_generation \
 codex exec -s workspace-write --enable image_generation \
   -i 03_SCRIPTS/<NN>_<slug>/clip1_start.png \
   -i 03_SCRIPTS/<NN>_<slug>/Sobaya_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Tokun_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yotan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Fukuchan_sheet.png -i 03_SCRIPTS/<NN>_<slug>/Yametaro_sheet.png \
-  "Use your image generation tool to create the LAST-FRAME still of the same shot. Image 1 is this clip's start frame — keep the same characters, art style, framing, lighting and location, change ONLY what the motion changes. Images 2..6 are character sheets (front/side/back turnarounds) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's END state>. Single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_end.png."
+  "Use your image generation tool to create the LAST-FRAME still of the same shot. Image 1 is this clip's start frame — keep the same characters, art style, framing, lighting and location, change ONLY what the motion changes. Images 2..6 are character sheets (front/side/back turnarounds) — identity/design references only, keep every face/design and NG-change element consistent. Prompt: <English scene description of the clip's END state>. <the run's Style block line, verbatim from ## Style block>. Single still frame, no text overlay. Save as 03_SCRIPTS/<NN>_<slug>/clip1_end.png."
 ```
 
 ### ポイント
@@ -319,14 +344,14 @@ codex exec -s workspace-write --enable image_generation \
 - 終了フレーム生成では**開始フレームを必ず`-i`の先頭に入れ**、「framing/lighting/locationは維持、動きが変える部分だけ変更」と指示する。これが崩壊防止の肝。
 - クリップ間で同じ絵を共有できるときは**再生成せずファイルを使い回す**（生成ゆらぎを持ち込まない）。
 - **セリフのあるクリップのキーフレームには話者を視覚的に示す**: 話者は口を開けて話している最中の状態（ジェスチャー含む）で描き、非話者は口を閉じた状態で描く（例: "Fukuchan is mid-speech with his mouth open; Yametaro's mouth is closed, listening"）。キーフレーム自体が「誰が話しているか」の最も強いシグナルになり、リップシンクの取り違えを防ぐ。生成後の目視確認でも話者の口の開閉をチェックする。
-- 画像生成プロンプトには台本のProp states（グラスの中身の量、瓶の持ち方等）・Fixture layout（蝶番側・ノブ側・開き方向）・**Scene ledgerの時間帯・光の句**（例: "bright midday daylight"）をそのまま含める。**生成後は各画像をReadで開き、小道具の状態がProp state ledgerの該当セルと一致しているか、建具の蝶番・ノブがFixture layoutどおりの側にあるか、時間帯・照明がScene ledgerの該当セルと一致しているか目視確認する**（例: 開始フレームのグラスが空であるべきなのに満杯で描かれていないか、瓶に口をつけていないか、閉まったドアのノブが蝶番側に付いたり消えたりしていないか、昼の場面なのに夜景・夜空で描かれていないか）。ズレていたら再生成する。キーフレームが間違っているとSeedanceは間違った状態間を忠実に補間してしまう。
+- 画像生成プロンプトには台本のProp states（グラスの中身の量、瓶の持ち方等）・Fixture layout（蝶番側・ノブ側・開き方向）・**Scene ledgerの時間帯・光の句**（例: "bright midday daylight"）・**画風固定文（`## Style block`の1行・逐語）**・**画面内の人数指定**をそのまま含める。**生成後は各画像をReadで開き、小道具の状態がProp state ledgerの該当セルと一致しているか、建具の蝶番・ノブがFixture layoutどおりの側にあるか、時間帯・照明がScene ledgerの該当セルと一致しているか、人物数が台本と一致し同一キャラが重複していないか、画風がクリップ1の開始フレームと揃っているか目視確認する**（例: 開始フレームのグラスが空であるべきなのに満杯で描かれていないか、瓶に口をつけていないか、閉まったドアのノブが蝶番側に付いたり消えたりしていないか、昼の場面なのに夜景・夜空で描かれていないか、アニメ調で始まったチェーンが実写調に変わっていないか）。ズレていたら再生成する。キーフレームが間違っているとSeedanceは間違った状態間を忠実に補間してしまう。
 - 全キーフレーム生成後、**台帳（Prop state ledger・Scene ledger）の1行ごとに全フレームを時系列で見比べる最終チェック**を行う: 隣り合うフレーム間で小道具の状態が変わっている箇所すべてに、そのクリップのMotion prompt内の対応する動作があるか、時間帯・場所が変わっている箇所すべてに画面内の移動・時間経過の描写が対応しているかを確認する。動作なしに状態が飛んでいる境界が1つでもあれば、該当フレームを再生成するか台本を直してから次の工程に進む。
 - 保存先は必ず `03_SCRIPTS/<NN>_<slug>/` 配下。
 - ユーザーからストーリーを渡された際は、台本・Seedanceプロンプト作成に続けて、このルール（クリップごとに開始＋終了の2枚、前フレームを種にチェーン、キャラ参照を必ず添付、つなぎ目は共有）に沿ってキーフレームも生成する。
 
-## 4. CapCut（Seedance 2.0）への入力対応表
+## 4. CapCut（Seedance）への入力対応表
 
-動画生成は**CapCutに統合されたSeedance 2.0**で行う。CapCutは**開始フレーム（Frame A）と終了フレーム（Frame B）のデュアル参照**に対応し、参照画像も多数渡せる。`script.md`の各クリップに、**CapCutの各スロットへ何を渡すか**の対応表を必ず書く（ユーザーがそのまま設定できるようにするため）。
+動画生成は**CapCutに統合されたSeedance（ユーザー指定のバージョン。指定がなければ現行既定の2.5）**で行う。CapCutは**開始フレーム（Frame A）と終了フレーム（Frame B）のデュアル参照**に対応し、参照画像も多数渡せる。`script.md`の各クリップに、**CapCutの各スロットへ何を渡すか**の対応表を必ず書く（ユーザーがそのまま設定できるようにするため）。
 
 各クリップの記載例（英語で書く）:
 
@@ -349,9 +374,11 @@ codex exec -s workspace-write --enable image_generation \
 - **全クリップのMotion promptに画面内テキスト禁止の否定指示を必ず入れる**（ステップ1「画面内テキスト禁止ルール」参照）: "do NOT render any on-screen text — no subtitles, no captions, no lettering, no Japanese characters; the video must contain no text at all"。台本が画面内文字を指定するクリップは、その文字だけを唯一の例外として明記する。`validate_run_bundle.py`がこの記載（"on-screen text"への言及）を機械検証する。
 - **全クリップのMotion promptに、Scene ledgerの時間帯・光の句を必ず入れる**（ステップ1「Scene ledger」参照）: 例 "bright midday daylight"。場所転換のあるクリップは転換先の時間帯まで明示し、典型絵が別の時間帯の場所には否定形を添える（"it is DAYTIME, NOT night"）。`validate_run_bundle.py`が`## Scene ledger`セクションの存在と、各Motion prompt内の時間帯語（daylight/daytime/midday/night等）を機械検証する。
 - **全クリップのMotion promptに、音響指定（`Soundscape:`と`Music:`）を必ず入れる**（ステップ1「音響設計ルール」参照）。既定は "Music: no background music"。`validate_run_bundle.py`が両方の記載を機械検証する。
+- **全クリップのMotion promptに、画風固定文（`## Style block`の1行）を一字一句同じ文で入れる**（ステップ1「画風固定ルール」参照）。`validate_run_bundle.py`が逐語一致を機械検証する。
+- **全クリップのMotion promptに、画面内の総人数と「各キャラは1人だけ」を入れる**（ステップ1「キャラクター人数の固定」参照）。登場・退場・受け渡しのあるクリップは複製禁止の否定形まで入れる。
 - **カメラワークは「種類＋振幅＋速度」の標準記法で書く**（公式H3プロンプトガイド由来）: 例 "the camera pushes in with small amplitude at slow speed"、"slow lateral tracking shot, small amplitude"。"dynamic camera"のような曖昧語だけの指定はしない。カメラを動かさないクリップは "locked-off static camera" と明示する（無指定だとモデルが勝手にカメラを動かす）。
 - **Durationは必ず明示設定する。** CapCut側のデフォルト尺（約8秒）のまま生成しない。対応表のDuration値を毎クリップ設定し、生成後に実尺が一致しているか確認する（全クリップが同じ約8秒になっていたらデフォルト尺のまま生成された兆候）。セリフのあるクリップのDurationは**「サンプル音声の合計長＋約1秒」**を目安にする（ステップ1「リップシンク精度ルール」参照。Seedanceが生成した実発話がこの目安とずれても動画を正とする）。
-- 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedance 2.0は多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
+- 参照画像は**必要な枚数だけ渡してよい**（CapCut/Seedanceは多数の参照画像を受け付ける）。登場キャラ全員分＋必要なら小道具・環境の参照を足して同一性を固める。プロンプト側で「これらは identity/design reference であって構図ではない」と役割を明記する。
 - **Reference images表に書いた全ファイルはラン専用ディレクトリ直下に実在しなければならない。** 表だけ書いて実ファイルを同梱しない状態は禁止する。
 - **キャラの参照はキャラクターシート`02_CHARACTERS/<キャラ名>_sheet.png`を第一に使う**（多面図モデルシート。複数アングル＋NG要素クローズアップ＋表情差分を1枚で渡せるため、横顔・後ろ姿・演技でのidentity driftに強い）。プロンプトには "Image N: <name>'s character model sheet — turnaround, detail close-ups and expressions of the SAME character, identity/design reference only, NOT a composition reference" のように役割を明記する。参照は画風の揃ったものだけを混ぜる（実写写真とアニメ調シートを同時に渡すと折衷して顔が変わるため、原則シート側に統一する）。
 - **参照ごとに「保持する属性 / 引き継がない属性」を列挙する**（公式Ref2VAガイドのretention分析由来）: 役割宣言（identity/design reference only）に加えて、何を維持し何を持ち込まないかを明示すると、シートのポーズ・背景・パネルレイアウトが動画に漏れるのを防げる。例: "@Image1 = Sobaya_sheet.png — PRESERVE: face, mask, body build, outfit and its colors (all NG-change elements); do NOT carry over: pose, camera angle, sheet background or panel layout"。**PRESERVE側にはそのキャラのNG変更要素を必ず含める。**
@@ -366,7 +393,7 @@ Required attached reference files: @Image1 = Sobaya_sheet.png — Sobaya's chara
 - Motion prompt中で`@ImageN`を使う場合、その同じプロンプト内の`Required attached reference files:`行に、`@ImageN = 実ファイル名`と役割が必ず存在しなければならない。名前＋外見同定句だけでは添付宣言の代用にならない。
 - **複数キャラが同時に映るクリップ**では、相対的な体格差を固定するため、身長比較画像`02_CHARACTERS/height_lineup.png`（全キャラ横並び・文字なし）をスケール参照として追加で渡してよい。プロンプトに "@ImageN is the height/scale reference for relative body sizes — NOT a composition reference" と役割を明記する。
 - クリップをまたぐつなぎ目は、**前クリップの Frame B と次クリップの Frame A を同一画像**にすることで消す（ステップ3のチェーンで担保）。
-- **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedance 2.0は動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。**この参考動画をCodexに作らせることは禁止**（Codexの担当は静止画キーフレームのみ）。ユーザーから明示的に依頼されたときに限り、Codex以外の手段（Three.jsレンダリング等）で作成する。
+- **（上級）動きの誘導を強めたいクリップ**では、`04_GAME_ASSETS/voxel`の該当キャラGLBをThree.jsで動かして書き出した短い動画（webm/mp4、合計15秒以内）を**モーション参照として追加で渡す**（Seedanceは動画参照に対応）。構図とキャラはキーフレームで固定したまま、動きだけ正確になぞらせられる。**この参考動画をCodexに作らせることは禁止**（Codexの担当は静止画キーフレームのみ）。ユーザーから明示的に依頼されたときに限り、Codex以外の手段（Three.jsレンダリング等）で作成する。
 - **セリフのあるクリップすべて**で、対応表に `Audio` 行を追加し（ステップ2で生成したサンプル音声ファイルをクリップ内の発話順に列挙）、**ボイスサンプルとしてSeedance生成の入力に添付する**。Motion promptにサンプル参照の指示（声・話し方をサンプルに合わせて生成させる）を含める:
 
 ```
@@ -401,6 +428,8 @@ Generate ONLY Clip 1, then verify ALL of the following before touching any other
 - [ ] NO on-screen text appears that the script did not explicitly call for — no spontaneous subtitles, captions, or Japanese lettering anywhere in the clip
 - [ ] Ambient sound and music match the prompt's Soundscape/Music lines — no unrequested background music, no out-of-place ambience
 - [ ] Hinges, handles and other fixture hardware stay on the edges given in the Fixture layout table in EVERY frame (handles never disappear, jump to the hinge side, or duplicate — especially when a door finishes closing)
+- [ ] Every named character appears EXACTLY ONCE in EVERY frame — no duplicated characters and no extra copies of props, especially during appear/disappear/handoff actions (correct keyframes do NOT guarantee this; duplicates can appear mid-interpolation)
+- [ ] The art style matches the run's Style block and both keyframes, and stays consistent through the whole clip (no drift between anime-illustration and photoreal/live-action)
 - [ ] The clip duration equals the Duration specified in the CapCut inputs table (NOT the ~8s default). The generated speech may run shorter or longer than the sample wav's duration — that is acceptable; the VIDEO is the source of truth for audio timing.
 If any check fails, fix the inputs/prompt and regenerate Clip 1 until all pass.
 Only then generate the remaining clips, and re-run at least the voice + duration checks on every clip.
@@ -445,5 +474,6 @@ python3 .claude/skills/seedance/validate_run_bundle.py 03_SCRIPTS/<NN>_<slug>
 - 各クリップのFrame A、Frame B、Audioが存在する
 - `## Scene ledger`セクションが存在し、各Motion promptに時間帯・光の語（daylight/daytime/midday/evening/night等）が含まれている
 - 各Motion promptに音響指定（`Soundscape:`と`Music:`）が含まれている
+- `## Style block`セクションが存在し、各Motion promptに画風固定文（Style blockの1行）が一字一句そのまま含まれている
 
 検証失敗時は不足ファイルをコピーするかプロンプトを修正し、再実行する。**失敗したままユーザーへ完了報告してはいけない。**
