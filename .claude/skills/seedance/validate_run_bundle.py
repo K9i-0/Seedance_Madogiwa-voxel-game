@@ -37,6 +37,25 @@ def main() -> None:
             "(location & time-of-day ledger across all clips; prevents unexplained day/night jumps)"
         )
 
+    style_block = ""
+    style_header = re.search(r"^##.*\bStyle block\b.*$", text, re.MULTILINE | re.IGNORECASE)
+    if style_header is None:
+        errors.append(
+            "script.md lacks a '## Style block' section "
+            "(one-line art-style lock, repeated verbatim in every keyframe prompt and Motion prompt; "
+            "prevents the art style drifting between anime and photoreal across the run)"
+        )
+    else:
+        for line in text[style_header.end():].splitlines():
+            stripped = line.strip().lstrip("-").strip()
+            if stripped.startswith("#"):
+                break
+            if stripped:
+                style_block = stripped
+                break
+        if not style_block:
+            errors.append("'## Style block' section is empty; write the one-line style lock under the header")
+
     sections = list(re.finditer(r"^### CapCut inputs \(Clip (\d+)\)\s*$", text, re.MULTILINE))
     if not sections:
         errors.append("no '### CapCut inputs (Clip N)' sections found")
@@ -83,6 +102,13 @@ def main() -> None:
                     "(sound design rule: end every Motion prompt with a Soundscape line for ambient/action "
                     'sounds and a Music line — default "Music: no background music")'
                 )
+
+        if prompt and style_block and style_block not in prompt:
+            errors.append(
+                f"Clip {clip}: Motion prompt lacks the verbatim Style block line "
+                "(copy the one-line style lock from '## Style block' into every Motion prompt; "
+                "paraphrasing it re-enables style drift)"
+            )
 
         for slot, filename in mappings:
             if Path(filename).name != filename:
