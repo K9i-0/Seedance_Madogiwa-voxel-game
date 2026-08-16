@@ -19,6 +19,7 @@
 - **画像検証** (`/image-validation`): 動画制作スキル（`/seedance`・`/local-video`）で生成されたキーフレーム・参考画像を、動画生成に投入する前に検証するときに使用する。台本の台帳（Prop state ledger / Scene ledger / Fixture layout）と突き合わせ、プロンプト一致・物理整合（ドアノブ位置・ビール残量等）・時間帯/天気の連続性（昼夜ジャンプ防止）をQwen3-VL（Ollama）＋Claude目視の二重チェックで検証し、修正リスト（`fix_list.md`）を確定させる（再生成自体は生成元スキルのルールに従う）。Claude Code・Cursor・Codexのいずれからも実行できる（VLM検証にはOllamaが必要。無い環境ではスキル記載のフォールバックに従う）。詳細: `.claude/skills/image-validation/SKILL.md`
 - **ボクセルモデル制作** (`build-voxel-character-from-image`): キャラクターの参照画像からリグ付きボクセルGLBを作成・修正するときに使用する。成果物は`04_GAME_ASSETS/voxel/`に配置する。詳細: `.claude/skills/build-voxel-character-from-image/SKILL.md`
 - **2Dゲーム制作** (`/2d-game`): 2Dゲームを新規作成するとき、およびSeedanceで制作した完成動画（添付mp4）をオープニング/イベントのカットシーンとしてゲームに組み込むときに使用する。完成動画の正典置き場は`04_GAME_ASSETS/videos/`（ゲームからは`public/videos/`の相対symlinkで参照）。詳細: `.claude/skills/2d-game/SKILL.md`
+- **Madogiwa Studio登録** (`madogiwa-studio`): Hosted Remote MCP経由でエピソード、生成バージョン、使用モデル、プロンプト、入力画像・参照音声・資料、生成動画を共有台帳へ登録・確認するときに使用する。詳細: `.claude/skills/madogiwa-studio/SKILL.md`
 
 スキルの実体は`.claude/skills/`に置き、他エージェントへは各ツールのスキルディレクトリからsymlinkで同じSKILL.mdを参照させる: Codex CLI向けは`.agents/skills/`、Cursor向けは`.cursor/skills/`。スキルを追加したら、そのスキルを使わせたいエージェントのディレクトリにsymlinkを張ること。**例外として`local-video`と`colab-video`はClaude Code・Cursor専用**（`.cursor/skills/`にのみsymlinkし、`.agents/skills/`には張らない。Codexには公開しない）。
 
