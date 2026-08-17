@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "madogiwa-studio": {
+      "type": "http",
+      "url": "https://madogiwa-studio.madogiwa-studio.workers.dev/mcp"
+    }
+  }
+}
