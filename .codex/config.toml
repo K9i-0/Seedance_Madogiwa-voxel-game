@@ -1,0 +1,4 @@
+[mcp_servers.madogiwa-studio]
+url = "https://madogiwa-studio.madogiwa-studio.workers.dev/mcp"
+auth = "oauth"
+default_tools_approval_mode = "writes"
