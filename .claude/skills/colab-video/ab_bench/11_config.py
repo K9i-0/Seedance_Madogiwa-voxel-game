@@ -65,6 +65,9 @@ AB_ARMS = {
 # ノードのクラス名・入力名はComfyUIの更新で変わりうるので、**推測で書かず実機の定義から引く**。
 # 見つからない・埋められない場合は、実際の定義を出力してそのarmだけスキップする（他は流す）。
 
+AB_SCALAR_TYPES = {"INT", "FLOAT", "STRING", "BOOLEAN"}
+
+
 class Pick:
     """COMBO入力（選択肢がリストで返る入力）から正規表現で値を選ぶ指定。"""
     def __init__(self, *patterns, prefer_last=True):
@@ -143,19 +146,33 @@ def ab_build_inputs(info, cls, values, links=None, must=()):
     unmatched = [p for p in must if p not in hit_pats]
     assert not unmatched, (f"{cls}: 期待した入力 {unmatched} がこのノードに無い（名前が変わった可能性）\n"
                            f"  実機の入力: {sorted(allspec)}")
+    # **必須入力は既定値があっても省略できない。** ノード定義の既定値を埋めるのはフロントエンドで、
+    # API形式のprompt（このworkflow JSON）では埋まらず `required_input_missing` で弾かれる
+    # （2026-09実測: MiniMaxH3PDDAccApply の on_off_grid を省いて拒否された）。ここで実体化する。
     missing = []
     for name, spec in req.items():
         if name in out:
             continue
-        # リンクで渡す型（MODEL/SIGMAS等）と、既定値を持つ入力は未指定でよい
-        if isinstance(spec, (list, tuple)) and isinstance(spec[0], str) and spec[0].isupper():
+        if not isinstance(spec, (list, tuple)) or not spec:
+            missing.append((name, spec, "定義を解釈できない"))
             continue
-        if isinstance(spec, (list, tuple)) and len(spec) > 1 and isinstance(spec[1], dict) and "default" in spec[1]:
-            continue
-        if isinstance(spec, (list, tuple)) and isinstance(spec[0], list):
-            out[name] = spec[0][0] if spec[0] else None   # COMBOは先頭を既定として採る
-            continue
-        missing.append((name, spec))
+        typ = spec[0]
+        opts = spec[1] if len(spec) > 1 and isinstance(spec[1], dict) else {}
+        if isinstance(typ, list):                       # COMBO
+            val = opts.get("default", typ[0] if typ else None)
+            if val is None:
+                missing.append((name, spec, "選択肢が空"))
+            else:
+                out[name] = val
+        elif isinstance(typ, str) and typ in AB_SCALAR_TYPES:
+            if "default" in opts:
+                out[name] = opts["default"]
+            else:
+                missing.append((name, spec, "既定値が無いので値を決められない"))
+        elif isinstance(typ, str) and typ.isupper():    # MODEL/SIGMAS等＝リンクで渡す型
+            missing.append((name, spec, "リンクが必要だが繋いでいない"))
+        else:
+            missing.append((name, spec, "未知の型"))
     assert not missing, (f"{cls}: 必須入力を埋められない {missing}\n"
                          f"  実機の定義: required={req} optional={opt}")
     return out
@@ -191,9 +208,36 @@ def ab_insert_model_patch(g, info, cls, values, head, must=()):
     return nid
 
 
+def ab_validate_graph(g, info, strict_ids=()):
+    """グラフの全ノードについて、実機定義の必須入力が揃っているかを確認する。
+
+    ComfyUIの検証と同じことを投入前にやる（37分かけて1本焼いた後に次のarmが
+    `required_input_missing` で落ちる、という事故を防ぐ）。ベンチが挿したノード
+    （strict_ids）は例外にし、元からあるノードは警告に留める — 動いている本番
+    workflowを検証器の解釈違いで止めないため。
+    """
+    problems = []
+    for nid, node in g.items():
+        cls = node.get("class_type")
+        if cls not in info:
+            problems.append((nid, cls, "このComfyUIに存在しないノード"))
+            continue
+        req, _opt = ab_schema(info, cls)
+        for name, spec in req.items():
+            if name in node.get("inputs", {}):
+                continue
+            problems.append((nid, cls, f"必須入力 {name} が無い（定義: {spec}）"))
+    hard = [p for p in problems if p[0] in strict_ids]
+    assert not hard, "ベンチが組んだノードに不備がある:\n" + "\n".join(
+        f"  node {n} ({c}): {m}" for n, c, m in hard)
+    for n, c, m in problems:
+        print(f"  ⚠ 元のworkflowのnode {n} ({c}): {m}", flush=True)
+    return problems
+
+
 def ab_patch_workflow(g, info, spec, ctx):
     """armの指定どおりにworkflowを書き換える。戻り値は人が読める適用内容のリスト。"""
-    applied = []
+    applied, inserted = [], []
     head = ab_one(g, "UNETLoader")
     mode = "r2v" if ab_ids(g, "MiniMaxH3ReferenceToVideo") else "i2v"
 
@@ -209,6 +253,7 @@ def ab_patch_workflow(g, info, spec, ctx):
             v, a = spec["shift"]
             head = ab_insert_model_patch(g, info, cls, {r"video": v, r"audio": a}, head,
                                          must=(r"video", r"audio"))
+            inserted.append(head)
             applied.append(f"{cls}(video={v}, audio={a})")
         else:
             applied.append("⚠ SigmaShiftノードが見つからない → モデル既定のshiftのまま"
@@ -223,6 +268,7 @@ def ab_patch_workflow(g, info, spec, ctx):
             {r"lora_name": Pick(re.escape(os.path.basename(fname))),
              r"strength_model": float(BENCH_LORA_STRENGTH)}, head,
             must=(r"lora_name",))
+        inserted.append(head)
         applied.append(f"{cls}({os.path.basename(fname)}, strength={BENCH_LORA_STRENGTH})")
 
     if spec.get("pdd"):
@@ -237,6 +283,7 @@ def ab_patch_workflow(g, info, spec, ctx):
              r"^nfe$|steps": nfe,
              r"lora_strength": 1.0, r"head_strength": 1.0}, head,
             must=(r"(pdd|lora|acc).*(name|file)|^name$", r"^nfe$|steps"))
+        inserted.append(head)
         si = ab_output_index(info, cls, "SIGMAS")
         assert si is not None, f"{cls} が SIGMAS を出力しない — ノードの仕様変更を確認"
         g[ab_one(g, "SamplerCustomAdvanced")]["inputs"]["sigmas"] = [head, si]
@@ -252,6 +299,7 @@ def ab_patch_workflow(g, info, spec, ctx):
                  r"^tau$|threshold|sparsity": float(BENCH_SPARSE_TAU),
                  r"sink": True}, head,
                 must=(r"^(backend|mode|method)$", r"^tau$|threshold|sparsity"))
+            inserted.append(head)
             applied.append(f"{cls}(tau={BENCH_SPARSE_TAU}) — 候補: {cands}")
         else:
             raise AssertionError(
@@ -267,6 +315,7 @@ def ab_patch_workflow(g, info, spec, ctx):
     if spec.get("steps"):
         g[ab_one(g, "BasicScheduler")]["inputs"]["steps"] = int(spec["steps"])
         applied.append(f"steps={spec['steps']}")
+    ab_validate_graph(g, info, strict_ids=set(inserted))
     return applied
 
 
