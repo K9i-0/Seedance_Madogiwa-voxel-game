@@ -149,13 +149,24 @@ def input_files(cls_pat, key_pat):
 
 
 # === 1. 性能（セル12の実測 + bench_log.csv の s/it） ==========================
-STEP_SEC = {}
+# 所要時間と1step秒は bench_log.csv を正とする。**実際に生成した回だけ追記される**ので、
+# 生成済みarmがスキップされた再実行でも、その arm の実測が残っている（ab_arms.json 側は
+# スキップ時に測れないので0になる）。
+STEP_SEC, WALL_SEC = {}, {}
 for csvp in (f"{AB_OUT}/bench_log.csv",
              os.path.join(globals().get("OUT_DRIVE_DIR") or "/nonexistent", "bench_log.csv")):
     if os.path.exists(csvp):
         for row in csv.DictReader(open(csvp)):
             if row["chapter"] == CHAPTER:
                 STEP_SEC[row["label"]] = row["sampling_s_per_step"]
+                try:
+                    WALL_SEC[row["label"]] = float(row["wall_sec"])
+                except (TypeError, ValueError):
+                    pass
+
+
+def wall_of(arm):
+    return WALL_SEC.get(arm) or float((rows.get(arm) or {}).get("wall_sec") or 0)
 
 CU = {"A100": (8.0, 12.0)}.get("A100" if "A100" in next(iter(ARMS.values()))["gpu"] else "L4", (2.0, 3.0))
 YEN_PER_CU = 1179 / 100
@@ -272,13 +283,15 @@ A("## 性能")
 A("")
 A("| arm | 条件 | steps | sampler | 分 | s/step | vs base | VRAMピーク | 円/本(目安) |")
 A("|---|---|---:|---|---:|---:|---:|---:|---:|")
+_wbase = wall_of(BASE["arm"])
 for arm in ARMS:
     r = rows[arm]
-    w = r.get("wall_sec") or 0
-    ratio = f"x{(BASE['wall_sec'] / w):.2f}" if w and BASE.get("wall_sec") else "-"
+    w = wall_of(arm)
+    ratio = f"x{(_wbase / w):.2f}" if w and _wbase else "-"
     yen = f"¥{w / 3600 * CU[0] * YEN_PER_CU:.0f}〜{w / 3600 * CU[1] * YEN_PER_CU:.0f}" if w else "-"
+    vram = f"{r['vram_peak_mb']}MB" if r.get("vram_peak_mb") else "-（このセッションでは未生成）"
     A(f"| `{arm}` | {r['desc']} | {r.get('steps', '-')} | {r.get('sampler', '-')} | "
-      f"{w / 60:.1f} | {STEP_SEC.get(arm, '-')} | {ratio} | {r.get('vram_peak_mb', '-')}MB | {yen} |")
+      f"{w / 60:.1f} | {STEP_SEC.get(arm, '-')} | {ratio} | {vram} | {yen} |")
 A("")
 A("## 精度（自動指標）")
 A("")

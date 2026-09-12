@@ -236,26 +236,47 @@ else:
             _prev_weights = cur
         json.dump(g, open(AB_WF, "w"), ensure_ascii=False, indent=1)
         G["CHAPTERS"], G["AB_LABEL"], G["AUTO_SHUTDOWN"] = [BENCH_CHAPTER], _a, False
-        t0 = time.time()
+        _rec = dict(arm=_a, desc=AB_ARMS[_a]["desc"], chapter=BENCH_CHAPTER, mode=AB_MODE,
+                    frames=AB_FRAMES, gpu=G["NAME"], encoder=enc, unet=unet,
+                    steps=AB_ARMS[_a].get("pdd") or g[ab_one(g, "BasicScheduler")]["inputs"]["steps"],
+                    sampler=g[ab_one(g, "KSamplerSelect")]["inputs"]["sampler_name"],
+                    applied=AB_APPLIED[_a], out=f"{AB_OUT}/{BENCH_CHAPTER}__{_a}.mp4")
+        # このarmが既に生成済みならセル7はスキップする＝所要時間を測れない。
+        # **前回の実測を0で上書きしない**（中断・再開で回すのが前提なので、
+        # 再実行のたびに基準armの計測値が消えると比較表が壊れる・2026-09実測）。
+        _drv = os.path.join(G.get("OUT_DRIVE_DIR") or "/nonexistent", f"{BENCH_CHAPTER}__{_a}.mp4")
+        if os.path.exists(_rec["out"]) or os.path.exists(_drv):
+            _prev = AB_RESULT.get(_a) or {}
+            _rec.update(ok=True, err="", skipped=True,
+                        wall_sec=_prev.get("wall_sec") or 0,
+                        vram_peak_mb=_prev.get("vram_peak_mb") or 0)
+            print(f"skip（生成済み）— " + (f"前回の実測 {_rec['wall_sec'] / 60:.1f}分 を保持"
+                                          if _rec["wall_sec"] else
+                                          "このセッションでは測っていない（所要時間はbench_log.csvから読む）"),
+                  flush=True)
+            AB_RESULT[_a] = _rec
+            json.dump(AB_RESULT, open(AB_META, "w"), ensure_ascii=False, indent=1)
+            if G.get("OUT_DRIVE_DIR"):
+                shutil.copy(AB_META, G["OUT_DRIVE_DIR"])
+            continue
+        t0, vm_peak = time.time(), 0
         try:
             with AbVram() as vm:
                 ab_run(7)
+            vm_peak = vm.peak
             ok, err = True, ""
         except KeyboardInterrupt:
             raise
         except BaseException as e:
+            vm_peak = getattr(locals().get("vm"), "peak", 0)
             ok, err = False, f"{type(e).__name__}: {e}"
             for lg in sorted(glob.glob("/content/comfyui_*.log")):
                 with open(lg, errors="replace") as fo:
                     print(f"--- {lg}（末尾） ---\n{fo.read()[-2000:]}", flush=True)
             print(f"⚠ arm {_a} 失敗 — 残りのarmは続行する", flush=True)
-        AB_RESULT[_a] = dict(arm=_a, desc=AB_ARMS[_a]["desc"], ok=ok, err=err,
-                             chapter=BENCH_CHAPTER, mode=AB_MODE, frames=AB_FRAMES,
-                             gpu=G["NAME"], encoder=enc, unet=unet,
-                             steps=AB_ARMS[_a].get("pdd") or g[ab_one(g, "BasicScheduler")]["inputs"]["steps"],
-                             sampler=g[ab_one(g, "KSamplerSelect")]["inputs"]["sampler_name"],
-                             applied=AB_APPLIED[_a], wall_sec=round(time.time() - t0),
-                             vram_peak_mb=vm.peak, out=f"{AB_OUT}/{BENCH_CHAPTER}__{_a}.mp4")
+        _rec.update(ok=ok, err=err, skipped=False,
+                    wall_sec=round(time.time() - t0), vram_peak_mb=vm_peak)
+        AB_RESULT[_a] = _rec
         json.dump(AB_RESULT, open(AB_META, "w"), ensure_ascii=False, indent=1)
         if G.get("OUT_DRIVE_DIR"):
             shutil.copy(AB_META, G["OUT_DRIVE_DIR"])
