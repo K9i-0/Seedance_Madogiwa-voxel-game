@@ -102,6 +102,9 @@ print("★ A/Bベンチ: セットアップ（セル1→4→3→2→5→6）か�
 ab_run(1)
 assert G.get("VRAM", 0) > 0, "GPUランタイムでない（ランタイム → ランタイムのタイプを変更 → L4/A100）"
 G["AUTO_SHUTDOWN"] = False          # armごとに切断されないよう固定（切断は最後に BENCH_SHUTDOWN で）
+# 正典セル7の自動蒸留は必ず切る。ベンチはarmごとに自分でworkflowを組むので、
+# ここが有効だと base arm にまで蒸留が乗って比較が成立しなくなる。
+G["TURBO_8STEP"] = False
 AB_BASE_ENCODER, AB_BASE_I2V, AB_BASE_R2V = G["ENCODER"], G["UNET_I2V"], G["UNET_R2V"]
 ab_premount()
 ab_preupload()
@@ -183,7 +186,7 @@ for _a in AB_PLAN:
     for line in AB_APPLIED[_a] or ["（素のまま＝基準）"]:
         print(f"   + {line}", flush=True)
 
-# 所要時間・費用の見積り（L4+sage実測の線形則: 20stepで約0.534秒/フレーム/step）
+# 所要時間・費用の見積り（L4+sage実測の線形則: 0.645秒/フレーム/step・2026-09 ch3 158f）
 _h3 = [v for v in _g0.values() if str(v.get("class_type", "")).startswith("MiniMaxH3")][0]
 AB_FRAMES = int(BENCH_FRAMES) if BENCH_FRAMES else int(_h3["inputs"]["length"])
 _lo, _hi = AB_CU_PER_HOUR.get("A100" if "A100" in G["NAME"] else "L4", (2.0, 3.0))
@@ -194,14 +197,14 @@ for _a in AB_PLAN:
         continue
     g, _e, _u = AB_WFS[_a]
     st = AB_ARMS[_a].get("pdd") or g[ab_one(g, "BasicScheduler")]["inputs"]["steps"]
-    est = AB_FRAMES * 0.534 * st / 60 + 3
+    est = AB_FRAMES * 0.645 * st / 60 + 3
     _total_min += est
     print(f"{_a:<12}{st:>7}{est:>10.0f}", flush=True)
 print(f"\n合計の目安: 約{_total_min:.0f}分（{AB_FRAMES}フレーム＝{AB_FRAMES / 24:.1f}秒のチャプター×"
       f"{len([a for a in AB_PLAN if a not in AB_SKIP])}arm）"
       f" ≒ {_total_min / 60 * _lo:.0f}〜{_total_min / 60 * _hi:.0f} CU"
       f" ≒ ¥{_total_min / 60 * _lo * AB_YEN_PER_CU:.0f}〜{_total_min / 60 * _hi * AB_YEN_PER_CU:.0f}", flush=True)
-print("※ 見積りはL4+sage・20stepの実測からの線形外挿。蒸留armは実測で更に速いことがある", flush=True)
+print("※ 見積りはL4+sage実測（0.645秒/フレーム/step）からの線形外挿", flush=True)
 
 if BENCH_DRY_RUN:
     print(f"\n★ DRY RUN — ここで停止する。配線と見積りに問題が無ければ "

@@ -28,8 +28,12 @@ import sys
 DRIVE_IN = "/content/drive/MyDrive/h3_inputs"
 DRIVE_OUT = "/content/drive/MyDrive/h3_outputs"
 ZIP_EXCLUDES = ["*/ref_canvas_*", "*/validation/*", "*/.DS_Store", "*/h3/*"]
-# 所要時間の目安（2026-08実測: サンプリングはフレーム数×stepに線形）
-L4_SAGE_SEC_PER_FRAME = 0.534 * 20   # L4+SageAttentionの1フレームあたりサンプリング秒（20step）
+# 所要時間の目安（サンプリングはフレーム数×stepに線形）。
+# 2026-09実測（L4+sage・83ラン ch3 158f）: 101.9 s/step ÷ (158f × 20step) = 0.645 s/frame/step。
+# 既定は蒸留8step（正典ノートブックの TURBO_8STEP=True）なので8を掛ける。
+L4_SEC_PER_FRAME_STEP = 0.645
+STEPS = 8
+L4_SAGE_SEC_PER_FRAME = L4_SEC_PER_FRAME_STEP * STEPS
 OVERHEAD_MIN = 3                     # チャプターあたりのロード/VAE等
 
 
