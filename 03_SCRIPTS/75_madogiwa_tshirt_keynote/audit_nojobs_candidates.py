@@ -9,11 +9,11 @@ parser=argparse.ArgumentParser();parser.add_argument('--variant',default='sobaya
 processor=WhisperProcessor.from_pretrained('openai/whisper-small',cache_dir=ROOT/'.local/hazard_voice/asr-cache',local_files_only=True)
 model=WhisperForConditionalGeneration.from_pretrained('openai/whisper-small',cache_dir=ROOT/'.local/hazard_voice/asr-cache',local_files_only=True,use_safetensors=True).to('cpu')
 torch.set_num_threads(4)
-report=EP/f'remotion/out/speech-audit{suffix}.json'
+report=EP/'remotion/out/speech-audit-nojobs-repairs.json'
 previous={r['id']:r for r in json.loads(report.read_text())} if report.exists() else {}
 result=[]
-for row in json.loads((EP/f'remotion/src/dialogue{suffix}.json').read_text()):
- p=EP/f"line_{row['id']}_{row['speaker']}.wav"
+for row in json.loads((EP/'remotion/out/repair-nojobs-candidates.json').read_text()):
+ p=EP/row['candidate']
  if not p.exists():continue
  sha=hashlib.sha256(p.read_bytes()).hexdigest()
  if row['id'] in previous and previous[row['id']]['sha256']==sha:result.append(previous[row['id']]);continue
@@ -21,7 +21,7 @@ for row in json.loads((EP/f'remotion/src/dialogue{suffix}.json').read_text()):
  feat=processor(np.frombuffer(data,dtype='<f4'),sampling_rate=16000,return_tensors='pt',return_attention_mask=True)
  with torch.inference_mode():out=model.generate(**feat,language='ja',task='transcribe',max_new_tokens=160)
  recognized=processor.batch_decode(out,skip_special_tokens=True)[0]
- result.append({'id':row['id'],'expected':row['text'],'recognized':recognized,'sha256':sha})
+ result.append({'id':row['id'],'expected':row['speechText'],'recognized':recognized,'sha256':sha})
  report.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
  print(row['id'],recognized,flush=True)
 report.write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n')
