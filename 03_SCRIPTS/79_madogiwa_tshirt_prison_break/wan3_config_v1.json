@@ -5,7 +5,7 @@
   "project_duration": 30,
   "generation_mode": "single",
   "final_edit_duration": 33,
-  "prompt_file": "prompt_wan3.txt",
+  "prompt_file": "prompt_wan3_v1.txt",
   "media": [
     {
       "type": "reference_image",
@@ -21,16 +21,9 @@
     "ratio": "16:9",
     "duration": 30,
     "audio": true,
-    "seed": 26092480,
+    "seed": 26092479,
     "watermark": false,
     "prompt_extend": false
   },
-  "output": "wan3_prison_break_v2_seed26092480_480p.mp4",
-  "local_member_audio": {
-    "source": "local_madogiwa_member_japanese",
-    "line": "ビール……",
-    "path": "line_beer_sobaya.wav",
-    "reference_uploaded": false,
-    "mouth_visibility": "covered by rigid canonical mask"
-  }
+  "output": "wan3_prison_break_seed26092479_480p.mp4"
 }
